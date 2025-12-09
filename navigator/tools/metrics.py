@@ -42,40 +42,84 @@ def compute_ndcg_at_k(results: list, relevant_ids: list, k: int) -> float:
     
     return dcg / idcg if idcg > 0 else 0.0
 
-def benchmark_search(pipeline, gold_standard: dict, k: int, weights: list) -> dict:
-    """Run benchmark on gold standard queries."""
-    results = {
-        'precision_at_k': [],
-        'ndcg_at_k': [],
-        'latency_ms': []
-    }
-    
+def compute_map_at_k(results: list, relevant_ids: list, k: int) -> float:
+    """
+    Compute Mean Average Precision at k for a single query.
+    results: list of dicts with key 'image_id'
+    relevant_ids: list of relevant image_ids
+    """
+    if k == 0 or not relevant_ids:
+        return 0.0
+    hits = 0
+    precisions = []
+    for i, result in enumerate(results[:k], start=1):
+        if result['image_id'] in relevant_ids:
+            hits += 1
+            precisions.append(hits / i)
+    if not precisions:
+        return 0.0
+    # Average precision normalized by number of relevant items up to k
+    denom = min(len(relevant_ids), k)
+    return sum(precisions) / denom
+
+def benchmark_search(run_query_fn, gold_standard: dict, k: int) -> dict:
+    """Run benchmark on gold standard queries.
+    run_query_fn(path_or_id) -> dict with fields: results (list of dict), timings (dict)
+    """
+    per_query = []
     for query in gold_standard['queries']:
-        start_time = time.time()
-        
-        # This would need to be implemented based on your actual search pipeline
-        # For now, this is a placeholder
-        search_results = []  # Placeholder
-        
-        latency = (time.time() - start_time) * 1000  # Convert to ms
-        results['latency_ms'].append(latency)
-        
-        # Compute metrics
+        qid = query.get('query_id')
+        qpath = query.get('path')
+        qimage_id = query.get('image_id')
         relevant_ids = query.get('relevant_ids', [])
-        precision = compute_precision_at_k(search_results, relevant_ids, k)
-        ndcg = compute_ndcg_at_k(search_results, relevant_ids, k)
-        
-        results['precision_at_k'].append(precision)
-        results['ndcg_at_k'].append(ndcg)
-    
-    return results
+
+        t0 = time.time()
+        out = run_query_fn(qpath or qimage_id)
+        end_ms = (time.time() - t0) * 1000.0
+
+        results = out.get('results', [])
+        timings = out.get('timings', {})
+
+        p5 = compute_precision_at_k(results, relevant_ids, min(5, k))
+        ndcg10 = compute_ndcg_at_k(results, relevant_ids, min(10, k))
+        map10 = compute_map_at_k(results, relevant_ids, min(10, k))
+
+        per_query.append({
+            "query_id": qid or (qimage_id or qpath),
+            "p_at_5": p5,
+            "ndcg_at_10": ndcg10,
+            "map_at_10": map10,
+            "embed_ms": timings.get("embed_ms"),
+            "faiss_ms": timings.get("faiss_ms"),
+            "fusion_ms": timings.get("fusion_ms"),
+            "rerank_ms": timings.get("rerank_ms"),
+            "total_ms": end_ms,
+        })
+
+    # Aggregate
+    def _avg(key: str):
+        vals = [row[key] for row in per_query if row.get(key) is not None]
+        return float(np.mean(vals)) if vals else 0.0
+
+    summary = {
+        "queries": per_query,
+        "summary": {
+            "p_at_5": _avg("p_at_5"),
+            "ndcg_at_10": _avg("ndcg_at_10"),
+            "map_at_10": _avg("map_at_10"),
+            "embed_ms": _avg("embed_ms"),
+            "faiss_ms": _avg("faiss_ms"),
+            "fusion_ms": _avg("fusion_ms"),
+            "rerank_ms": _avg("rerank_ms"),
+            "total_ms": _avg("total_ms"),
+        }
+    }
+    return summary
 
 def main():
     parser = argparse.ArgumentParser(description="Benchmark search performance")
     parser.add_argument("--gold", required=True, help="Path to gold standard JSON file")
     parser.add_argument("--k", type=int, default=10, help="Number of results to evaluate")
-    parser.add_argument("--weights", nargs=3, type=float, default=[0.6, 0.2, 0.2], 
-                       help="Visual, spatial, and attribute weights")
     
     args = parser.parse_args()
     
@@ -89,14 +133,9 @@ def main():
     print(f"Benchmarking with k={args.k}, weights={args.weights}")
     print(f"Loaded {len(gold_standard.get('queries', []))} queries")
     
-    # Run benchmark (placeholder)
-    # results = benchmark_search(pipeline, gold_standard, args.k, args.weights)
-    
-    # For now, just print placeholder results
-    print("Benchmark completed (placeholder)")
-    print("Precision@k: 0.0")
-    print("nDCG@k: 0.0")
-    print("Average latency: 0.0ms")
+    # Note: This CLI main is a thin wrapper; actual benchmarking with pipeline is provided
+    # by navigator/scripts/benchmark_search.py
+    print("Use navigator/scripts/benchmark_search.py to run benchmarks against the live pipeline.")
 
 if __name__ == "__main__":
     main()

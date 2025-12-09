@@ -384,10 +384,12 @@ def search_id(body: SearchById, _: bool = Depends(require_token)):
         # This is a simplified approach - in practice you might want to store pre-computed features
         pass
     
+    t_fuse = time.time()
     fused_results, debug = fuse_and_sort(hydrated, D, body.weights, body.filters, 
                                         strict=body.strict, 
                                         query_spatial_features=query_spatial_features, 
                                         store=st)
+    fusion_ms = int((time.time() - t_fuse) * 1000)
     
     # Apply lens filtering
     lensed_results = apply_lens(fused_results, body.lens_ids, body.lens_projects, body.top_k)
@@ -401,6 +403,7 @@ def search_id(body: SearchById, _: bool = Depends(require_token)):
     return {
         "query_id": query_id,
         "latency_ms": ms,
+        "fusion_latency_ms": fusion_ms,
         "weights": body.weights.model_dump(),
         "weights_effective": debug["weights_effective"],
         "filters": body.filters.model_dump(),
@@ -504,7 +507,9 @@ def search_url(
     search_k = max(top_k, re_topk) if rerank else top_k
     search_k = max(search_k, top_k * 5, len(lens_ids_list or []) * 2, len(lens_projects_list or []) * 6, 100)
 
+    t_embed = time.time()
     q = embed_pil(pil)
+    embed_ms = int((time.time() - t_embed) * 1000)
     t0 = time.time()
     D, I = st.search(q, search_k)
     ms = int((time.time() - t0) * 1000)
@@ -520,8 +525,10 @@ def search_url(
         except Exception:
             query_spatial_features = None
 
+    t_fuse = time.time()
     fused_results, debug = fuse_and_sort(hydrated, D, w, f, strict=strict,
                                          query_spatial_features=query_spatial_features, store=st)
+    fusion_ms = int((time.time() - t_fuse) * 1000)
 
     # Lens filter
     lensed_results = apply_lens(fused_results, lens_ids_list, lens_projects_list, top_k)
@@ -529,7 +536,9 @@ def search_url(
     query_id = generate_query_id()
     return {
         "query_id": query_id,
+        "embed_latency_ms": embed_ms,
         "latency_ms": ms,
+        "fusion_latency_ms": fusion_ms,
         "weights": w.model_dump(),
         "weights_effective": debug.get("weights_effective", {}),
         "filters": f.model_dump(),
@@ -578,7 +587,9 @@ async def search_file(
     search_k = max(top_k, re_topk) if rerank else top_k
     search_k = max(search_k, top_k * 5, len(lens_ids_list or []) * 2, len(lens_projects_list or []) * 6, 100)
     
+    t_embed = time.time()
     q = embed_pil(pil)
+    embed_ms = int((time.time() - t_embed) * 1000)
     t0 = time.time()
     D, I = st.search(q, search_k)
     ms = int((time.time() - t0) * 1000)
@@ -620,8 +631,10 @@ async def search_file(
                         })
     
     # Use new fusion function
+    t_fuse = time.time()
     fused_results, fusion_debug = fuse_and_sort(hydrated, D, w, f, strict=strict, 
                                                query_spatial_features=query_spatial_features, store=st)
+    fusion_ms = int((time.time() - t_fuse) * 1000)
     
     # Apply lens filtering
     lensed_results = apply_lens(fused_results, lens_ids_list, lens_projects_list, top_k)
@@ -666,12 +679,13 @@ async def search_file(
     
     return {
         "query_id": query_id,
+        "embed_latency_ms": embed_ms,
         "latency_ms": ms,
         "weights": w.model_dump(),
         "weights_effective": debug_info["weights_effective"],
         "filters": f.model_dump(),
         "results": final_results,
-        "debug": debug_info
+        "debug": {**debug_info, "fusion_latency_ms": fusion_ms}
     }
 
 # ---- Study-specific upload endpoints ----
@@ -729,7 +743,9 @@ async def upload_query_image(
     search_k = max(top_k, re_topk) if rerank else top_k
     search_k = max(search_k, top_k * 5, len(lens_ids_list or []) * 2, len(lens_projects_list or []) * 6, 100)
 
+    t_embed = time.time()
     q = embed_pil(pil)
+    embed_ms = int((time.time() - t_embed) * 1000)
     t0 = time.time()
     D, I = st.search(q, search_k)
     ms = int((time.time() - t0) * 1000)
@@ -766,9 +782,11 @@ async def upload_query_image(
                             },
                         })
 
+    t_fuse = time.time()
     fused_results, fusion_debug = fuse_and_sort(
         hydrated, D, w, f, strict=strict, query_spatial_features=query_spatial_features, store=st
     )
+    fusion_ms = int((time.time() - t_fuse) * 1000)
     lensed_results = apply_lens(fused_results, lens_ids_list, lens_projects_list, top_k)
 
     debug_info = fusion_debug.copy()
@@ -794,12 +812,13 @@ async def upload_query_image(
     # No persistence: content is discarded, nothing written to corpus
     return {
         "query_id": query_id,
+        "embed_latency_ms": embed_ms,
         "latency_ms": ms,
         "weights": w.model_dump(),
         "weights_effective": debug_info.get("weights_effective", {}),
         "filters": f.model_dump(),
         "results": final_results,
-        "debug": debug_info,
+        "debug": {**debug_info, "fusion_latency_ms": fusion_ms},
     }
 
 
@@ -843,7 +862,9 @@ async def upload_explore(
         pil = downsample_pil(pil)
     except Exception:
         pass
+    t_embed = time.time()
     q = embed_pil(pil)
+    embed_ms = int((time.time() - t_embed) * 1000)
     t0 = time.time()
     D, I = st.search(q, top_k)
     ms = int((time.time() - t0) * 1000)
@@ -855,17 +876,20 @@ async def upload_explore(
     if mode == "plan" or mode == "true":
         query_spatial_features = compute_spatial_features(pil)
 
+    t_fuse = time.time()
     final_results, debug_info = fuse_and_sort(hydrated, D, w, f, strict=False, 
                                               query_spatial_features=query_spatial_features, store=st)
+    fusion_ms = int((time.time() - t_fuse) * 1000)
     query_id = generate_query_id()
     return {
         "query_id": query_id,
+        "embed_latency_ms": embed_ms,
         "latency_ms": ms,
         "weights": w.model_dump(),
         "weights_effective": debug_info.get("weights_effective", {}),
         "filters": f.model_dump(),
         "results": final_results,
-        "debug": debug_info,
+        "debug": {**debug_info, "fusion_latency_ms": fusion_ms},
     }
 
 @app.post("/feedback")

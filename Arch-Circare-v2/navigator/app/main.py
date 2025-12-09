@@ -4,6 +4,7 @@ from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional, Any
 import os, time
+import json
 import threading
 import numpy as np
 from PIL import Image
@@ -18,7 +19,7 @@ def l2n(x: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(x, axis=1, keepdims=True) + 1e-12
     return x / n
 from app.session import SessionStore, generate_query_id, compute_weight_nudges, apply_weight_nudges
-from app.models import Feedback, Weights
+from app.models import Feedback, Weights, Filters, SearchOpts, SearchById, SearchByVector
 from app.config import settings
 
 # Spatial feature computation imports
@@ -58,6 +59,8 @@ _store: Any | None = None
 _model = None
 _transform = None
 _session_store: SessionStore | None = None
+_enriched_cache: Optional[list[dict]] = None
+_enriched_mtime: float = 0.0
 
 def get_store():
     global _store
@@ -65,6 +68,24 @@ def get_store():
         from app.faiss_service import FaissStore  # lazy import to avoid loading faiss at import time
         _store = FaissStore(DATA_DIR)
     return _store
+
+def get_enriched() -> list[dict]:
+    """Load and cache enriched project JSON for fast access."""
+    global _enriched_cache, _enriched_mtime
+    p = os.path.join(DATA_DIR, "metadata", "projects_enriched.json")
+    try:
+        mtime = os.path.getmtime(p)
+    except FileNotFoundError:
+        return []
+    if _enriched_cache is None or mtime != _enriched_mtime:
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                _enriched_cache = json.load(f) or []
+            _enriched_mtime = mtime
+        except Exception:
+            _enriched_cache = []
+            _enriched_mtime = 0.0
+    return _enriched_cache or []
 
 def get_model_and_transform():
     global _model, _transform
@@ -182,33 +203,6 @@ async def _startup_warm():
             # Avoid crashing startup on warm errors
             pass
     threading.Thread(target=_warm, daemon=True).start()
-
-# Sprint A: Updated request models
-class Filters(BaseModel):
-    typology: Optional[str] = None
-    climate_bin: Optional[str] = None
-    massing_type: Optional[str] = None
-
-class SearchOpts(BaseModel):
-    top_k: int = 12
-    weights: Weights = Weights()
-    filters: Filters = Filters()
-    strict: bool = False
-    mode: Optional[str] = None
-
-class SearchById(BaseModel):
-    image_id: str
-    top_k: int = 12
-    weights: Weights = Weights()
-    filters: Filters = Filters()
-    strict: bool = False
-    mode: Optional[str] = None
-    lens_ids: Optional[List[str]] = None
-    lens_projects: Optional[List[str]] = None
-
-class SearchByVector(BaseModel):
-    vector: List[float]
-    top_k: int = 12
 
 def renorm_weights(wv: float, ws: float, wa: float, has_spatial: bool) -> np.ndarray:
     """Normalize weights, zeroing missing signals and re-normalizing to sum to 1."""
@@ -428,6 +422,20 @@ def list_project_images(project_id: str, _: bool = Depends(require_token)):
             "url": f"/images/{project_id}/{fname}"
         })
     return {"project_id": project_id, "images": out}
+
+@app.get("/projects/enriched")
+def list_projects_enriched(_: bool = Depends(require_token)):
+    """Return all enriched projects (lightweight; cached)."""
+    return get_enriched()
+
+@app.get("/projects/enriched/{project_id}")
+def get_project_enriched(project_id: str, _: bool = Depends(require_token)):
+    """Return enriched data for a single project_id."""
+    items = get_enriched()
+    for it in items:
+        if it.get("project_id") == project_id:
+            return it
+    raise HTTPException(status_code=404, detail="Enriched project not found")
 
 @app.post("/search/vector")
 def search_vector(body: SearchByVector, _: bool = Depends(require_token)):

@@ -1,3 +1,6 @@
 [submodule "Arch-Circare-v2/ui/src/figma-ui"]
 	path = Arch-Circare-v2/ui/src/figma-ui
 	url = https://github.com/danielguerrarmz-create/Archipediadesignsystemfrontend
+[submodule "daniel_frontend"]
+	path = daniel_frontend
+	url = https://github.com/danielguerrarmz-create/WORKING-PROGRESS-SEARCH-ENGINE
