@@ -176,13 +176,36 @@ class FaissStore:
         return np.load(path).astype("float32")
 
     def results_payload(self, D: np.ndarray, I: np.ndarray) -> List[Dict[str, Any]]:
-        out = []
+        """Hydrate FAISS hits into a list of result dicts, skipping entries that
+        don't have usable metadata or a thumbnail image on disk.
+
+        This protects the frontend from rendering 'empty' project cards for
+        orphaned embeddings or missing images without mutating the underlying
+        index or metadata.
+        """
+        out: List[Dict[str, Any]] = []
         hydrated = self._hydrate([int(i) for i in I.tolist()])
+
         for rank, (dist, idx, meta) in enumerate(zip(D.tolist(), I.tolist(), hydrated), start=1):
+            pid = meta.get("project_id")
+            thumb_url = meta.get("thumb_url")
+
+            # Require a real project_id
+            if not pid or str(pid).strip() in {"null", "None"}:
+                continue
+
+            # Require a thumbnail path and that the file exists on disk
+            if not thumb_url:
+                continue
+            thumb_path = os.path.join(self.data_dir, thumb_url.lstrip("/"))
+            if not os.path.isfile(thumb_path):
+                continue
+
             out.append({
                 "rank": rank,
                 "distance": float(dist),
                 "faiss_id": int(idx),
-                **meta
+                **meta,
             })
+
         return out
