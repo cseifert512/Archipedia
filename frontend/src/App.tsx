@@ -14,6 +14,7 @@ export default function App() {
     <div className="min-h-screen bg-white">
       <Switch>
         <Route path="/" component={Homepage} />
+        <Route path="/canvas" component={ResultsPage} />
         <Route path="/search/text" component={TextSearchPage} />
         <Route path="/search/image" component={ImageSearchPage} />
         <Route path="/results" component={ResultsPage} />

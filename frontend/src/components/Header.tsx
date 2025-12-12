@@ -68,13 +68,12 @@ export function Header({
     if (onSearch) {
       onSearch(searchQuery, uploadedImage);
     } else {
-      // Default behavior: navigate to results
-      if (searchQuery.trim() || uploadedImage) {
-        const params = new URLSearchParams();
-        if (searchQuery.trim()) params.set('q', searchQuery);
-        if (uploadedImage) params.set('type', 'image');
-        setLocation(`/results?${params.toString()}`);
-      }
+      // Default behavior: navigate into canvas (even if query is empty).
+      const params = new URLSearchParams();
+      if (searchQuery.trim()) params.set('q', searchQuery);
+      if (uploadedImage) params.set('type', 'image');
+      const qs = params.toString();
+      setLocation(qs ? `/canvas?${qs}` : "/canvas");
     }
   };
 

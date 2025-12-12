@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
@@ -187,12 +187,13 @@ export function Homepage() {
   };
 
   const handleSearch = (query: string, image: string | null) => {
-    if (query.trim() || image) {
-      const params = new URLSearchParams();
-      if (query.trim()) params.set('q', query);
-      if (image) params.set('type', 'image');
-      setLocation(`/results?${params.toString()}`);
-    }
+    // Landing page behavior: always enter the canvas experience.
+    // If the user provided a query/image, preserve it in the URL.
+    const params = new URLSearchParams();
+    if (query.trim()) params.set('q', query);
+    if (image) params.set('type', 'image');
+    const qs = params.toString();
+    setLocation(qs ? `/canvas?${qs}` : "/canvas");
   };
 
   return (
