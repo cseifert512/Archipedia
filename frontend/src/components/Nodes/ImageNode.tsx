@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Handle, Position } from 'reactflow';
 import { BaseNodeData } from '../../types/nodes';
-import { X, Play, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Play, Upload, Image as ImageIcon, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 
 interface ImageNodeData extends BaseNodeData {
@@ -36,6 +36,8 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
   const handleRun = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (id) {
+      // Make the UI responsive immediately
+      updateNode(id, { executionStatus: 'running', executionError: undefined });
       await executeFromNode(id);
     }
   };
@@ -92,9 +94,10 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
   const inputHandleY = 60; // After header
   const outputHandleY = 200; // After image section (tuned for smaller default size)
 
-  const resultCount = Array.isArray((data as any).executionResult?.results)
-    ? (data as any).executionResult.results.length
-    : 0;
+  const status = (data as any).executionStatus as string | undefined;
+  const err = ((data as any).executionError as string | undefined) || undefined;
+  const results = (data as any).executionResult?.results;
+  const resultCount = Array.isArray(results) ? results.length : 0;
 
   return (
     <div
@@ -182,6 +185,10 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
           IMAGE
         </h3>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          {/* Status icon */}
+          {status === 'running' && <Loader2 size={14} className="animate-spin" />}
+          {status === 'error' && <AlertTriangle size={14} />}
+          {status === 'success' && <CheckCircle2 size={14} />}
           <button
             onClick={handleRun}
             onMouseDown={(e) => e.stopPropagation()}
@@ -333,8 +340,30 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
           </button>
         )}
 
-        {/* Execution summary */}
-        {data.executionStatus === 'success' && resultCount > 0 && (
+        {/* Execution summary / errors */}
+        {status === 'error' && (
+          <div
+            style={{
+              marginTop: '10px',
+              padding: '8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255,0,0,0.25)',
+              backgroundColor: 'rgba(255,0,0,0.06)',
+              fontFamily: 'var(--font-primary)',
+              fontSize: '10px',
+              color: 'rgba(0,0,0,0.8)',
+              lineHeight: 1.35,
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>Run failed</div>
+            <div style={{ opacity: 0.85 }}>{err || 'Unknown error'}</div>
+            <div style={{ opacity: 0.6, marginTop: '6px' }}>
+              Tip: make sure the backend is running on <code>http://localhost:8000</code> (or set <code>VITE_API_BASE_URL</code>).
+            </div>
+          </div>
+        )}
+
+        {status === 'success' && resultCount > 0 && (
           <div
             style={{
               marginTop: '10px',

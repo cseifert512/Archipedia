@@ -4,7 +4,7 @@ import { NodeData, NodeType } from '../types/nodes';
 import { executeWorkflow, NodeExecutionResult, validateWorkflow } from '../lib/workflowEngine';
 import { validateWorkflowEdges, canCreateEdge } from '../lib/DataFlowValidator';
 import { useExecutionStore } from './executionStore';
-import { createNode } from '../lib/nodeFactory';
+import { createNode, createPrecedentNode } from '../lib/nodeFactory';
 
 interface CanvasState {
   nodes: Node<NodeData>[];
@@ -158,6 +158,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
             executionStatus: result.status === 'success' ? 'success' :
                            result.status === 'error' ? 'error' : 'running',
             executionResult: result.outputs,
+            executionError: result.error,
             cached: result.cached,
           });
 
@@ -208,6 +209,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       downstreamNodes.has(e.source) && downstreamNodes.has(e.target)
     );
 
+    // Mark the starting node as running immediately so the UI reacts even if the executor fails early.
+    get().updateNode(nodeId, { executionStatus: 'running', executionError: undefined });
     set({ isExecuting: true });
 
     try {
@@ -216,11 +219,27 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         edgesToUse,
         undefined,
         (nodeId, result) => {
+          // Always store execution metadata on the node so UI can reflect failures too.
           get().updateNode(nodeId, {
             executionStatus: result.status === 'success' ? 'success' :
                            result.status === 'error' ? 'error' : 'running',
             executionResult: result.outputs,
+            executionError: result.error,
           });
+
+          // Special-case: when an Image node returns projects, spawn a Precedent node once per query_id.
+          const thisNode = get().nodes.find(n => n.id === nodeId);
+          if (thisNode?.data?.type === 'image' && result.status === 'success') {
+            const projects = (result.outputs as any)?.projects;
+            const queryId = (result.outputs as any)?.query_id;
+            const alreadySpawned = (thisNode.data as any).lastSpawnQueryId && (thisNode.data as any).lastSpawnQueryId === queryId;
+            if (Array.isArray(projects) && projects.length > 0 && queryId && !alreadySpawned) {
+              const pos = thisNode.position || { x: 0, y: 0 };
+              const newNode = createPrecedentNode({ x: pos.x + 340, y: pos.y }, projects);
+              get().addNodes([newNode]);
+              get().updateNode(nodeId, { lastSpawnQueryId: queryId });
+            }
+          }
         }
       );
     } catch (error) {
