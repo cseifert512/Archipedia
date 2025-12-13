@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Camera, RefreshCw, X, RotateCw } from "lucide-react";
 import { useLocation } from "wouter";
 import { LensFrame } from "./LensFrame";
@@ -27,6 +27,7 @@ const searchPlaceholders = [
 ];
 
 interface HeaderProps {
+  variant?: "default" | "minimal";
   onSearch?: (query: string, image: string | null) => void;
   onRefresh?: () => void;
   showRefresh?: boolean;
@@ -35,6 +36,7 @@ interface HeaderProps {
 }
 
 export function Header({ 
+  variant = "default",
   onSearch, 
   onRefresh, 
   showRefresh = false,
@@ -47,6 +49,38 @@ export function Header({
   const [isPlaceholderVisible, setIsPlaceholderVisible] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
+
+  if (variant === "minimal") {
+    return (
+      <header
+        className="fixed top-0 left-0 right-0"
+        style={{
+          padding: "16px",
+          zIndex: 50,
+          display: "flex",
+          justifyContent: "flex-start",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setLocation("/")}
+          className="hover:opacity-80 transition-opacity"
+          style={{
+            fontFamily: "var(--font-primary)",
+            fontSize: "12px",
+            background: "rgba(255,255,255,0.8)",
+            border: "1px solid rgba(0,0,0,0.12)",
+            borderRadius: "8px",
+            padding: "8px 10px",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+          }}
+        >
+          ← Back
+        </button>
+      </header>
+    );
+  }
 
   // Placeholder rotation effect with fade animation
   useEffect(() => {

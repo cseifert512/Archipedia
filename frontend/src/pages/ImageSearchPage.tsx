@@ -1,5 +1,5 @@
 import { Upload, X } from "lucide-react";
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Header } from "../components/Header";
 import { Input } from "../components/ui/input";
