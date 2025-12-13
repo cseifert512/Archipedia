@@ -86,14 +86,14 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
 
   // Calculate positions for connection handles
   const inputHandleY = 60; // After header
-  const outputHandleY = 250; // After image section
+  const outputHandleY = 200; // After image section (tuned for smaller default size)
 
   return (
     <div
       className="rounded-lg overflow-visible cursor-move group transition-all"
       style={{
-        width: '320px',
-        minHeight: '300px',
+        width: '280px',
+        minHeight: '240px',
         backgroundColor: '#FFFFFF',
         border: selected ? '2px solid #64B5FF' : '1px solid rgba(0,0,0,0.1)',
         borderRadius: '12px',

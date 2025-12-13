@@ -34,14 +34,14 @@ export const TextNode: React.FC<TextNodeProps> = ({
 
   // Calculate positions for connection handles
   const inputHandleY = 60; // After header
-  const outputHandleY = 200; // After content section
+  const outputHandleY = 170; // After content section (tuned for smaller default size)
 
   return (
     <div
       className="rounded-lg overflow-visible cursor-move group transition-all"
       style={{
-        width: '320px',
-        minHeight: '400px',
+        width: '280px',
+        minHeight: '260px',
         backgroundColor: '#FFFFFF',
         border: selected ? '2px solid #F5F1E8' : '1px solid rgba(0,0,0,0.1)',
         borderRadius: '12px',
@@ -218,7 +218,7 @@ export const TextNode: React.FC<TextNodeProps> = ({
             fontSize: '11px',
             fontFamily: 'Monaco, monospace',
             resize: 'vertical',
-            minHeight: '150px',
+            minHeight: '110px',
             flex: '1',
             background: '#fafafa',
             outline: 'none',
