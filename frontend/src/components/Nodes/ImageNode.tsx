@@ -21,7 +21,7 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
   selected,
   id
 }) => {
-  const { deleteNode, executeFromNode } = useCanvasStore();
+  const { deleteNode, executeFromNode, updateNode } = useCanvasStore();
   const [imageUrl, setImageUrl] = useState(data.imageUrl || '');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +44,11 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImageUrl(e.target?.result as string);
+        const nextUrl = e.target?.result as string;
+        setImageUrl(nextUrl);
+        if (id) {
+          updateNode(id, { imageUrl: nextUrl, imageFile: file });
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -87,6 +91,10 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
   // Calculate positions for connection handles
   const inputHandleY = 60; // After header
   const outputHandleY = 200; // After image section (tuned for smaller default size)
+
+  const resultCount = Array.isArray((data as any).executionResult?.results)
+    ? (data as any).executionResult.results.length
+    : 0;
 
   return (
     <div
@@ -323,6 +331,25 @@ export const ImageNode: React.FC<ImageNodeProps> = ({
           >
             Change Image
           </button>
+        )}
+
+        {/* Execution summary */}
+        {data.executionStatus === 'success' && resultCount > 0 && (
+          <div
+            style={{
+              marginTop: '10px',
+              padding: '8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(0,0,0,0.08)',
+              backgroundColor: 'rgba(100, 181, 255, 0.08)',
+              fontFamily: 'var(--font-primary)',
+              fontSize: '10px',
+              color: 'rgba(0,0,0,0.75)',
+              textAlign: 'center',
+            }}
+          >
+            Found {resultCount} visually similar matches
+          </div>
         )}
       </section>
     </div>
