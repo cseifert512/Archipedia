@@ -3,7 +3,7 @@
 This repository contains the **index layer** for Archipedia: a full‑stack architectural precedent search engine. It includes:
 
 - A **FastAPI** backend (`navigator/`) that exposes image search and project APIs backed by a FAISS index.
-- A **React/Vite** frontend (`ui-v2/`) that provides a minimal, production‑ready search UI.
+- A **React/Vite** frontend (`frontend/`) that provides the search + node workflow UI.
 
 The goal of this layer is to provide a clean, well‑documented, data‑backed search API that a richer “Interaction Layer” (future node/graph UI) can build on.
 
@@ -37,7 +37,7 @@ Key endpoints:
 ### Frontend (React/Vite)
 
 ```bash
-cd ui-v2
+cd frontend
 npm install
 npm run dev
 ```
@@ -45,10 +45,21 @@ npm run dev
 By default the frontend talks to `http://localhost:8000`. To point it at a different backend (e.g. on Render), set:
 
 ```bash
-VITE_API_BASE=https://your-backend-url
+VITE_API_BASE_URL=https://your-backend-url
 ```
 
-in `ui-v2/.env.local`.
+in your environment (Render Static Site env var), or use `frontend/env.example` as a reference.
+
+---
+
+## Deploying on Render (Blueprint)
+
+This repo includes a `render.yaml` blueprint that deploys:
+
+- `arch-circare-api` (FastAPI backend from `navigator/`)
+- `arch-circare-ui` (static frontend from `frontend/`)
+
+Import the repo into Render as a Blueprint and deploy from the `MVP` branch.
 
 ---
 
