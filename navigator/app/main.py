@@ -782,6 +782,20 @@ async def search_file(
     except Exception:
         pass
     # #endregion
+
+    # Render debugging: emit a normal stdout log so it shows up in Render service logs.
+    try:
+        logger.info(
+            "search_file counts: top_k=%s search_k=%s hydrated=%s lensed=%s final=%s query_id=%s",
+            top_k,
+            search_k,
+            len(hydrated) if isinstance(hydrated, list) else None,
+            len(lensed_results) if isinstance(lensed_results, list) else None,
+            len(final_results) if isinstance(final_results, list) else None,
+            query_id,
+        )
+    except Exception:
+        pass
     
     return {
         "query_id": query_id,
