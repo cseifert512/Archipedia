@@ -3,10 +3,10 @@ services:
     name: arch-circare-api
     env: python
     rootDir: navigator
-    branch: main
+    branch: MVP
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     plan: starter
     healthCheckPath: /healthz
     envVars:
@@ -32,13 +32,15 @@ services:
   - type: web
     name: arch-circare-ui
     env: static
-    rootDir: ui-v2
-    branch: main
+    rootDir: frontend
+    branch: MVP
     autoDeploy: true
     buildCommand: npm ci --no-audit --no-fund && npm run build
     staticPublishPath: build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://arch-circare-api.onrender.com
-      - key: VITE_API_BASE
         value: https://arch-circare-api.onrender.com
