@@ -7,7 +7,7 @@ services:
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    plan: starter
+    plan: standard
     healthCheckPath: /healthz
     envVars:
       - key: DATA_DIR
@@ -43,4 +43,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://arch-circare-api.onrender.com
+        value: https://arch-circare-api-bfle.onrender.com
