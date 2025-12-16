@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 
 interface LensFrameProps {
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
   blurBackground?: boolean;
   style?: React.CSSProperties;

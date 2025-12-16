@@ -1,9 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional, Any
-import os, time
+import os, time, json
+from datetime import datetime, timezone
 import threading
 import numpy as np
 from PIL import Image
@@ -228,6 +229,18 @@ class SearchByVector(BaseModel):
     vector: List[float]
     top_k: int = 12
 
+
+class EnterpriseLead(BaseModel):
+    """Lead capture payload from the /enterprise landing page."""
+    name: Optional[str] = None
+    email: str
+    company: Optional[str] = None
+    role: Optional[str] = None
+    asset_count: Optional[str] = None
+    deployment: Optional[str] = None
+    message: Optional[str] = None
+    source: Optional[str] = None
+
 def renorm_weights(wv: float, ws: float, wa: float, has_spatial: bool) -> np.ndarray:
     """Normalize weights, zeroing missing signals and re-normalizing to sum to 1."""
     w = np.array([wv, ws if has_spatial else 0.0, wa], dtype="float32")
@@ -336,6 +349,29 @@ def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters:
 @app.get("/healthz")
 def healthz():
     # Lightweight health check; avoid loading heavy subsystems
+    return {"ok": True}
+
+
+@app.post("/enterprise/lead")
+async def enterprise_lead(body: EnterpriseLead, request: Request):
+    """
+    Simple lead capture endpoint.
+    Writes JSONL to DATA_DIR/logs/enterprise_leads.jsonl for easy inspection and later integration.
+    """
+    logs_dir = os.path.join(DATA_DIR, "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    path = os.path.join(logs_dir, "enterprise_leads.jsonl")
+
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "ip": getattr(request.client, "host", None),
+        "user_agent": request.headers.get("user-agent"),
+        "lead": body.model_dump(),
+    }
+
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
     return {"ok": True}
 
 @app.get("/latent/points")
