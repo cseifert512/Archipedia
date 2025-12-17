@@ -6,6 +6,7 @@ import { ResultsPage } from "./pages/ResultsPage";
 import { EmptyResultsPage } from "./pages/EmptyResultsPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { EnterprisePage } from "./pages/enterprise";
+import { ClassicSearchPage } from "./pages/ClassicSearchPage";
 import { Toaster } from "./components/ui/sonner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -16,6 +17,7 @@ export default function App() {
       <Switch>
         <Route path="/" component={Homepage} />
         <Route path="/enterprise" component={EnterprisePage} />
+        <Route path="/search" component={ClassicSearchPage} />
         <Route path="/canvas" component={ResultsPage} />
         <Route path="/search/text" component={TextSearchPage} />
         <Route path="/search/image" component={ImageSearchPage} />

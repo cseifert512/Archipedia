@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
-import { mockProjects, Project } from "../lib/mockData";
+import { mockProjects } from "../lib/mockData";
 import { useSearchStore, SearchResult } from "../stores/searchStore";
 import { useCanvasStore } from "../stores/canvasStore";
 import { NodeCanvas } from "../components/Canvas/NodeCanvas";
-import { NodePalette } from "../components/Sidebar/NodePalette";
 import { NodePaletteSidebar } from "../components/Sidebar/NodePaletteSidebar";
-import { TriSlider } from "../components/TriSlider";
 import { ResultsGridCompact } from "../components/SearchResults/ResultsGridCompact";
-import { spawnChildNodes } from "../lib/spawnUtils";
 import { PrecedentProject } from "../types/nodes";
 import { 
   createTextNode, 
@@ -33,8 +30,9 @@ interface FusionWeights {
 }
 
 export function ResultsPage() {
-  const [location, setLocation] = useLocation();
-  const params = new URLSearchParams(location.split("?")[1]);
+  const [, setLocation] = useLocation();
+  // wouter's useLocation only returns pathname, use window.location.search for query params
+  const params = new URLSearchParams(window.location.search);
   const initialSearchQuery = params.get("q") || "";
   const imageParam = params.get("image");
   
@@ -53,36 +51,10 @@ export function ResultsPage() {
     attribute: 34,
   });
 
-  const [mode] = useState<'search'>('search');
-  const [showRecipeBuilder, setShowRecipeBuilder] = useState(false);
   const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [executionLogs, setExecutionLogs] = useState<Array<{
-    id: number;
-    command: string;
-    timestamp: number;
-    input?: string;
-    output?: string;
-  }>>([
-    {
-      id: 1,
-      command: 'search',
-      timestamp: Date.now() - 180000,
-      input: 'Mediterranean courtyard buildings, hot climate',
-      output: 'Found 12 relevant precedents',
-    },
-    {
-      id: 2,
-      command: 'stack',
-      timestamp: Date.now() - 120000,
-      input: '3 selected precedents',
-      output: 'Courtyard Stack created with extracted DNA',
-    },
-  ]);
   
   const { searchResults, setSearchResults, setSearchQuery: setStoreQuery } = useSearchStore();
   const { nodes, addNodes, executeWorkflow } = useCanvasStore();
-  const nextIdRef = useRef(0);
 
   // Initialize search results from mock data with multi-modal scores (only if hasSearched)
   useEffect(() => {
@@ -112,6 +84,21 @@ export function ResultsPage() {
       }
     }
   }, [hasSearched, searchResults.length, setSearchResults, currentSearchQuery, setStoreQuery]);
+
+  // Track if we've already handled the image param
+  const imageParamHandledRef = useRef(false);
+
+  // Create an image node if imageParam is present in URL
+  useEffect(() => {
+    if (imageParam && !imageParamHandledRef.current) {
+      imageParamHandledRef.current = true;
+      const imageNode = createImageNode(
+        { x: 100, y: 200 },
+        imageParam
+      );
+      addNodes([imageNode]);
+    }
+  }, [imageParam, addNodes]);
 
   // Filter results
   const filteredResults = useMemo(() => {

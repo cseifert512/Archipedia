@@ -45,6 +45,11 @@ export function ProjectDetailPage() {
   const project = mockProjects.find(p => p.id === projectId) || mockProjects[0];
   const [, setLocation] = useLocation();
   
+  // Parse URL query params for image_id and from context
+  const urlParams = new URLSearchParams(window.location.search);
+  const imageIdParam = urlParams.get('image_id');
+  const fromContext = urlParams.get('from');
+  
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isContributionModalOpen, setIsContributionModalOpen] = useState(false);
@@ -286,7 +291,9 @@ export function ProjectDetailPage() {
                       padding: "8px 16px",
                       marginBottom: "16px"
                     }}>
-                      <Link href="/results" className="hover:text-[#000000]">Search Results</Link>
+                      <Link href={fromContext === 'search' ? '/search' : '/results'} className="hover:text-[#000000]">
+                        {fromContext === 'search' ? 'Classic Search' : 'Search Results'}
+                      </Link>
                       <span>›</span>
                       <span style={{ color: "#000000" }}>{project.name}</span>
                     </div>
@@ -358,7 +365,7 @@ export function ProjectDetailPage() {
                       }}>
                         <Share2 size={20} />
                       </button>
-                      <Link href="/results">
+                      <Link href={fromContext === 'search' ? '/search' : '/results'}>
                         <button className="rounded-lg transition-all" style={{
                           backgroundColor: "rgba(255,255,255,0.8)",
                           backdropFilter: "blur(12px)",

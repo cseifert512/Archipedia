@@ -25,3 +25,13 @@ cd frontend
 npm install
 
 npm run dev
+
+# Project page links
+Homepage: http://localhost:5173/
+Enterprise page: http://localhost:5173/enterprise
+Canvas (same as ResultsPage component): http://localhost:5173/canvas
+Text search: http://localhost:5173/search/text
+Image search: http://localhost:5173/search/image
+Results: http://localhost:5173/results
+Empty results: http://localhost:5173/empty
+Project detail (dynamic): http://localhost:5173/project/1 (you can swap 1 for other ids like 2, 3, etc.)

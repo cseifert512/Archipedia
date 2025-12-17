@@ -106,9 +106,6 @@ export function Homepage() {
     const newImages: ScrollingImage[] = [];
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const marginLeft = viewportWidth * 0.125; // 12.5% margin
-    const marginRight = viewportWidth * 0.125;
-    const contentWidth = viewportWidth - marginLeft - marginRight;
     
     // Create enough images to fill and scroll
     let currentX = -200; // Start off-screen left
@@ -147,9 +144,7 @@ export function Homepage() {
     const animate = () => {
       setImages(prevImages => {
         const viewportWidth = window.innerWidth;
-        const marginLeft = viewportWidth * 0.125;
         const marginRight = viewportWidth * 0.125;
-        const contentWidth = viewportWidth - marginLeft - marginRight;
         
         return prevImages.map(img => {
           let newX = img.x + img.speed;
@@ -312,6 +307,10 @@ export function Homepage() {
                 transition: "opacity 0.3s ease",
                 cursor: "pointer",
                 zIndex: 1,
+              }}
+              onClick={() => {
+                // Navigate to canvas with the image URL to create an image node
+                setLocation(`/canvas?image=${encodeURIComponent(img.url)}`);
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.opacity = "1";
