@@ -46,7 +46,7 @@ export function Footer() {
             </button>
 
             <button
-              onClick={() => setLocation("/about")}
+              onClick={() => setLocation("/enterprise")}
               className="relative hover-underline"
               style={{ 
                 fontFamily: "var(--font-primary)",

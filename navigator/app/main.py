@@ -35,6 +35,23 @@ DATA_DIR = settings.data_dir
 app = FastAPI(title="Design Precedent Navigator API", version="0.2.0")
 logger = logging.getLogger("navigator")
 
+# ---- debug-mode logger (writes NDJSON to the session log file) ----
+def _agent_debug_log(hypothesis_id: str, location: str, message: str, data: dict, run_id: str = "pre-fix"):
+    try:
+        p = r"c:\Users\clayh\OneDrive\Documents\Desktop\Archipedia\.cursor\debug.log"
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "sessionId": "debug-session",
+                "runId": run_id,
+                "hypothesisId": hypothesis_id,
+                "location": location,
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+            }, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
 # Enable CORS (tighten to configured origins)
 allowed_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()] or ["*"]
 app.add_middleware(
@@ -362,15 +379,48 @@ async def enterprise_lead(body: EnterpriseLead, request: Request):
     os.makedirs(logs_dir, exist_ok=True)
     path = os.path.join(logs_dir, "enterprise_leads.jsonl")
 
+    # #region agent log
+    try:
+        _agent_debug_log(
+            "H3",
+            "navigator/app/main.py:enterprise_lead(entry)",
+            "enterprise_lead called",
+            {
+                "client_is_none": request.client is None,
+                "client_type": type(request.client).__name__ if request.client is not None else None,
+                "has_client_host_attr": hasattr(request.client, "host") if request.client is not None else False,
+            },
+        )
+    except Exception as e:
+        _agent_debug_log("H3", "navigator/app/main.py:enterprise_lead(entry)", "logging failed", {"error": str(e)})
+    # #endregion
+
+    client = request.client
+    ip = None
+    try:
+        if client is not None:
+            ip = getattr(client, "host", None)
+    except Exception:
+        ip = None
+
     record = {
         "ts": datetime.now(timezone.utc).isoformat(),
-        "ip": getattr(request.client, "host", None),
+        "ip": ip,
         "user_agent": request.headers.get("user-agent"),
         "lead": body.model_dump(),
     }
 
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    # #region agent log
+    _agent_debug_log(
+        "H3",
+        "navigator/app/main.py:enterprise_lead(exit)",
+        "enterprise_lead wrote record",
+        {"ip_value": record.get("ip") is not None, "has_user_agent": bool(record.get("user_agent"))},
+    )
+    # #endregion
 
     return {"ok": True}
 
@@ -712,6 +762,40 @@ async def search_file(
     
     # Generate query ID
     query_id = generate_query_id()
+
+    # #region agent log
+    try:
+        _agent_debug_log(
+            "H8",
+            "navigator/app/main.py:search_file(exit)",
+            "search_file returning results",
+            {
+                "top_k": top_k,
+                "search_k": search_k,
+                "hydrated_count": len(hydrated) if isinstance(hydrated, list) else None,
+                "lensed_count": len(lensed_results) if isinstance(lensed_results, list) else None,
+                "final_count": len(final_results) if isinstance(final_results, list) else None,
+                "has_query_id": bool(query_id),
+            },
+            run_id="render-debug",
+        )
+    except Exception:
+        pass
+    # #endregion
+
+    # Render debugging: emit a normal stdout log so it shows up in Render service logs.
+    try:
+        logger.info(
+            "search_file counts: top_k=%s search_k=%s hydrated=%s lensed=%s final=%s query_id=%s",
+            top_k,
+            search_k,
+            len(hydrated) if isinstance(hydrated, list) else None,
+            len(lensed_results) if isinstance(lensed_results, list) else None,
+            len(final_results) if isinstance(final_results, list) else None,
+            query_id,
+        )
+    except Exception:
+        pass
     
     return {
         "query_id": query_id,
