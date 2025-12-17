@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
-import { Bookmark, Search, ExternalLink } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Bookmark, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MatchReasonBadge } from './MatchReasonBadge';
+
+export interface ProjectImage {
+  image_id: string;
+  thumb_url: string;
+  image_url: string;
+}
 
 export interface SearchResultData {
   project_id: string;
@@ -11,6 +17,7 @@ export interface SearchResultData {
   image_id: string;
   thumb_url: string;
   image_url: string;
+  images?: ProjectImage[]; // Multiple images for the project
   score: number;
   match_reason?: string;
   badges?: {
@@ -22,9 +29,9 @@ export interface SearchResultData {
 
 interface SearchResultCardProps {
   result: SearchResultData;
-  onOpen: (result: SearchResultData) => void;
-  onSave: (result: SearchResultData) => void;
-  onSearchLikeThis: (result: SearchResultData) => void;
+  onOpen: (result: SearchResultData, currentImageIndex?: number) => void;
+  onSave: (result: SearchResultData, currentImage?: ProjectImage) => void;
+  onSearchLikeThis: (result: SearchResultData, currentImage?: ProjectImage) => void;
   isSaved?: boolean;
 }
 
@@ -37,6 +44,27 @@ export function SearchResultCard({
 }: SearchResultCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Build images array - use provided images or fallback to single image
+  const images: ProjectImage[] = result.images && result.images.length > 0
+    ? result.images
+    : [{ image_id: result.image_id, thumb_url: result.thumb_url, image_url: result.image_url }];
+
+  const currentImage = images[currentImageIndex];
+  const hasMultipleImages = images.length > 1;
+
+  const handlePrevImage = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+    setImageError(false);
+  }, [images.length]);
+
+  const handleNextImage = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev + 1) % images.length);
+    setImageError(false);
+  }, [images.length]);
 
   const badges = [
     ...(result.badges?.typology || []),
@@ -76,7 +104,7 @@ export function SearchResultCard({
       >
         {!imageError ? (
           <img
-            src={result.thumb_url || result.image_url}
+            src={currentImage.thumb_url || currentImage.image_url}
             alt={result.project_title}
             style={{
               position: 'absolute',
@@ -110,6 +138,87 @@ export function SearchResultCard({
           </div>
         )}
 
+        {/* Image Navigation Arrows */}
+        {isHovered && hasMultipleImages && (
+          <>
+            <button
+              onClick={handlePrevImage}
+              style={{
+                position: 'absolute',
+                left: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255,255,255,0.85)',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 150ms ease',
+                opacity: 0.5,
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.5')}
+            >
+              <ChevronLeft size={18} style={{ color: '#555' }} />
+            </button>
+            <button
+              onClick={handleNextImage}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255,255,255,0.85)',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 150ms ease',
+                opacity: 0.5,
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.5')}
+            >
+              <ChevronRight size={18} style={{ color: '#555' }} />
+            </button>
+          </>
+        )}
+
+        {/* Image Indicator Dots */}
+        {isHovered && hasMultipleImages && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '40px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              gap: '4px',
+            }}
+          >
+            {images.map((_, idx) => (
+              <div
+                key={idx}
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: idx === currentImageIndex ? 'white' : 'rgba(255,255,255,0.5)',
+                  transition: 'all 150ms ease',
+                }}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Hover Actions */}
         {isHovered && (
           <div
@@ -123,7 +232,7 @@ export function SearchResultCard({
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => onSave(result)}
+              onClick={() => onSave(result, currentImage)}
               title="Save to board"
               style={{
                 width: '32px',
@@ -148,7 +257,7 @@ export function SearchResultCard({
               />
             </button>
             <button
-              onClick={() => onSearchLikeThis(result)}
+              onClick={() => onSearchLikeThis(result, currentImage)}
               title="Search like this"
               style={{
                 width: '32px',

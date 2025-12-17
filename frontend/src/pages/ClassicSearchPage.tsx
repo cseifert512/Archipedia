@@ -9,6 +9,7 @@ import {
   type MatchEmphasis,
   type FilterState,
   type SearchResultData,
+  type ProjectImage,
 } from '../components/ClassicSearch';
 import { useBoardStore } from '../stores/boardStore';
 import { mockProjects } from '../lib/mockData';
@@ -103,11 +104,32 @@ export function ClassicSearchPage() {
       // In production, this would call POST /search
       await new Promise((resolve) => setTimeout(resolve, 800));
 
-      // Generate mock results from mockProjects
+      // Generate mock results from mockProjects with multiple images per project
+      const additionalImageUrls = [
+        'https://images.unsplash.com/photo-1545558014-8692077e9b5c?w=600',
+        'https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=600',
+        'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?w=600',
+        'https://images.unsplash.com/photo-1486718448742-163732cd1544?w=600',
+      ];
+
       const mockResults: SearchResultData[] = mockProjects.map((project, index) => {
         const baseScore = 0.95 - index * 0.015;
         const visualWeight = searchEmphasis === 'visual' ? 0.8 : searchEmphasis === 'semantic' ? 0.2 : 0.5;
         const finalScore = Math.max(0.3, baseScore * (0.8 + visualWeight * 0.2));
+
+        // Generate 3-5 images per project
+        const numImages = 3 + (index % 3);
+        const projectImages: ProjectImage[] = [
+          { image_id: `img_${project.id}_01`, thumb_url: project.imageUrl, image_url: project.imageUrl },
+        ];
+        for (let i = 1; i < numImages; i++) {
+          const imgUrl = additionalImageUrls[(index + i) % additionalImageUrls.length];
+          projectImages.push({
+            image_id: `img_${project.id}_0${i + 1}`,
+            thumb_url: imgUrl,
+            image_url: imgUrl,
+          });
+        }
 
         return {
           project_id: project.id,
@@ -118,6 +140,7 @@ export function ClassicSearchPage() {
           image_id: `img_${project.id}_01`,
           thumb_url: project.imageUrl,
           image_url: project.imageUrl,
+          images: projectImages,
           score: finalScore,
           match_reason:
             searchEmphasis === 'visual'
@@ -212,15 +235,23 @@ export function ClassicSearchPage() {
     }
   };
 
-  const handleOpenResult = (result: SearchResultData) => {
-    setLocation(`/project/${result.project_id}?image_id=${result.image_id}&from=search`);
+  const handleOpenResult = (result: SearchResultData, currentImageIndex?: number) => {
+    const imageId = currentImageIndex !== undefined && result.images 
+      ? result.images[currentImageIndex]?.image_id 
+      : result.image_id;
+    setLocation(`/project/${result.project_id}?image_id=${imageId}&from=search`);
   };
 
-  const handleSaveResult = (result: SearchResultData) => {
+  const handleSaveResult = (result: SearchResultData, currentImage?: ProjectImage) => {
+    const imageToSave = currentImage || { 
+      image_id: result.image_id, 
+      thumb_url: result.thumb_url, 
+      image_url: result.image_url 
+    };
     saveToActiveBoard({
       project_id: result.project_id,
-      image_id: result.image_id,
-      thumb_url: result.thumb_url,
+      image_id: imageToSave.image_id,
+      thumb_url: imageToSave.thumb_url,
       title_snapshot: result.project_title,
       architect_snapshot: result.architect,
       location_snapshot: result.location_display,
@@ -240,9 +271,10 @@ export function ClassicSearchPage() {
     });
   };
 
-  const handleSearchLikeThis = (result: SearchResultData) => {
-    // Use the result's image to search
-    performSearch('', result.image_url, 'visual');
+  const handleSearchLikeThis = (result: SearchResultData, currentImage?: ProjectImage) => {
+    // Use the currently displayed image to search
+    const imageUrl = currentImage?.image_url || result.image_url;
+    performSearch('', imageUrl, 'visual');
   };
 
   // Check if an item is saved

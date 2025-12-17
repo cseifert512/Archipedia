@@ -1,6 +1,6 @@
 export { ClassicSearchBar, type MatchEmphasis } from './ClassicSearchBar';
 export { FilterSidebar, type FilterState } from './FilterSidebar';
-export { SearchResultCard, type SearchResultData } from './SearchResultCard';
+export { SearchResultCard, type SearchResultData, type ProjectImage } from './SearchResultCard';
 export { MatchReasonBadge } from './MatchReasonBadge';
 export { BoardDrawer } from './BoardDrawer';
 
