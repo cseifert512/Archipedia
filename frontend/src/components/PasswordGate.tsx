@@ -182,24 +182,35 @@ export function PasswordGate({ children }: PasswordGateProps) {
             </button>
           </form>
 
-          <p
-            style={{
-              fontFamily: "var(--font-secondary)",
-              fontSize: "12px",
-              color: "var(--text-tertiary)",
-              textAlign: "center",
-              marginTop: "24px",
-            }}
-          >
-            Need access?{" "}
+          <div style={{ marginTop: "24px", textAlign: "center" }}>
+            <p
+              style={{
+                fontFamily: "var(--font-secondary)",
+                fontSize: "13px",
+                color: "var(--text-tertiary)",
+                marginBottom: "12px",
+              }}
+            >
+              Don't have access yet?
+            </p>
             <a
               href="/#contact"
-              className="hover:text-[var(--accent)] transition-colors"
-              style={{ color: "var(--text-secondary)" }}
+              className="inline-block hover:opacity-90 transition-all"
+              style={{
+                fontFamily: "var(--font-primary)",
+                fontSize: "12px",
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                borderRadius: "10px",
+                border: "1px solid var(--border-light)",
+                background: "transparent",
+                padding: "12px 20px",
+                color: "var(--text-primary)",
+              }}
             >
-              Contact us
+              Request Access
             </a>
-          </p>
+          </div>
         </div>
       )}
 

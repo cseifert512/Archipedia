@@ -11,6 +11,7 @@ interface LandingHeaderProps {
 const NAV_LINKS = [
   { label: "Product", href: "#product" },
   { label: "Demo", href: "#demo" },
+  { label: "Live Demo", href: "/canvas" },
   { label: "Enterprise", href: "#enterprise" },
   { label: "Security", href: "#security" },
   { label: "Contact", href: "#contact" },
