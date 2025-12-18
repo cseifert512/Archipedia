@@ -11,7 +11,12 @@ import { trackLandingEvent } from "../lib/analytics";
 
 // Placeholder constants - replace with real values
 const CALENDLY_URL = "https://calendly.com/archipedia/pilot"; // TODO: Replace
-const LOOM_VIDEO_ID = ""; // TODO: Replace with actual Loom video ID
+// Video configuration - supports Google Drive or Loom
+const VIDEO_CONFIG = {
+  type: "gdrive" as "gdrive" | "loom",
+  gdriveId: "1Jq-DgxztZ5Yg3vQ18_c7g-rhhrxI-GsQ",
+  loomId: "",
+};
 const FORMSPREE_ID = "xwveeqoq";
 
 export function LandingPage() {
@@ -250,7 +255,7 @@ export function LandingPage() {
           </h2>
 
           <div className="grid gap-12 lg:grid-cols-2 items-start">
-            {/* Left: Loom Embed */}
+            {/* Left: Video Embed */}
             <div
               ref={loomRef}
               className="glass rounded-xl overflow-hidden"
@@ -259,14 +264,25 @@ export function LandingPage() {
                 border: "1px solid var(--border-light)",
               }}
             >
-              {loomLoaded && LOOM_VIDEO_ID ? (
-                <iframe
-                  src={`https://www.loom.com/embed/${LOOM_VIDEO_ID}`}
-                  frameBorder="0"
-                  allowFullScreen
-                  style={{ width: "100%", height: "100%" }}
-                  title="Archipedia Demo"
-                />
+              {loomLoaded && (VIDEO_CONFIG.gdriveId || VIDEO_CONFIG.loomId) ? (
+                VIDEO_CONFIG.type === "gdrive" && VIDEO_CONFIG.gdriveId ? (
+                  <iframe
+                    src={`https://drive.google.com/file/d/${VIDEO_CONFIG.gdriveId}/preview`}
+                    frameBorder="0"
+                    allowFullScreen
+                    allow="autoplay"
+                    style={{ width: "100%", height: "100%" }}
+                    title="Archipedia Demo"
+                  />
+                ) : (
+                  <iframe
+                    src={`https://www.loom.com/embed/${VIDEO_CONFIG.loomId}`}
+                    frameBorder="0"
+                    allowFullScreen
+                    style={{ width: "100%", height: "100%" }}
+                    title="Archipedia Demo"
+                  />
+                )
               ) : (
                 <div
                   className="w-full h-full flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
@@ -281,7 +297,7 @@ export function LandingPage() {
                       <ArrowRight size={24} />
                     </div>
                     <div className="body-s" style={{ color: "var(--text-tertiary)" }}>
-                      {LOOM_VIDEO_ID ? "Click to load video" : "[Loom Video Placeholder]"}
+                      Click to load video
                     </div>
                   </div>
                 </div>
