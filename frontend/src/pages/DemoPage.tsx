@@ -302,7 +302,7 @@ export function DemoPage() {
               color: "var(--text-tertiary)",
             }}
           >
-            © {new Date().getFullYear()} Spolia Labs
+            © {new Date().getFullYear()} Pear.Design
           </p>
         </div>
       </footer>

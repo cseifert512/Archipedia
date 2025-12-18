@@ -409,7 +409,7 @@ export function LandingPage() {
             Features
           </h2>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 grid-cols-1 md:grid-cols-3" style={{ rowGap: "32px" }}>
             {[
               {
                 icon: Image,
@@ -1016,7 +1016,7 @@ export function LandingPage() {
                   color: "rgba(255,255,255,0.5)",
                 }}
               >
-                © {new Date().getFullYear()} Spolia Labs. Built in Austin.
+                © {new Date().getFullYear()} Pear.Design. Built in Austin.
               </p>
             </div>
           </div>

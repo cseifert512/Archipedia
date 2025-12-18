@@ -41,7 +41,7 @@ export function Footer() {
                 ARCHIPEDIA
               </div>
               <div style={{ fontSize: "19px", fontWeight: 300 }}>
-                SPOLIA LABS
+                PEAR.DESIGN
               </div>
             </button>
 
