@@ -7,6 +7,7 @@ import { ResultsPage } from "./pages/ResultsPage";
 import { EmptyResultsPage } from "./pages/EmptyResultsPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { EnterprisePage } from "./pages/enterprise";
+import { ClassicSearchPage } from "./pages/ClassicSearchPage";
 import { Toaster } from "./components/ui/sonner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PasswordGate } from "./components/PasswordGate";
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/" component={LandingPage} />
         <Route path="/demo" component={DemoPage} />
         <Route path="/enterprise" component={EnterprisePage} />
+        <Route path="/search" component={ClassicSearchPage} />
         <Route path="/canvas">
           <PasswordGate>
             <ResultsPage />
