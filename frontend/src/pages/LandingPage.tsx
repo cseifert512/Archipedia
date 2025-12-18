@@ -676,42 +676,19 @@ export function LandingPage() {
           className="container"
           style={{ maxWidth: "1200px", paddingTop: "80px", paddingBottom: "80px" }}
         >
-          <div className="grid gap-12 lg:grid-cols-2">
-            {/* Left: Photo/Avatar (optional) */}
-            <div
-              className="glass rounded-xl overflow-hidden flex items-center justify-center"
-              style={{
-                border: "1px solid var(--border-light)",
-                minHeight: "300px",
-                background: "rgba(0,0,0,0.02)",
-              }}
-            >
-              <div className="text-center p-8">
-                <div
-                  className="w-24 h-24 rounded-full mx-auto mb-4"
-                  style={{ background: "var(--border-light)" }}
-                />
-                <div className="body-s" style={{ color: "var(--text-tertiary)" }}>
-                  [Team Photo Placeholder]
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Bio */}
-            <div>
-              <h2 className="heading-m" style={{ marginBottom: "24px" }}>
-                Why we're building this
-              </h2>
-              <p className="body-l" style={{ marginBottom: "16px" }}>
-                Architecture has incredible institutional knowledge—locked in folders and PDFs.
-                We're turning that into something searchable, evidence-based, and eventually
-                verifiable against constraints.
-              </p>
-              <p className="body-m" style={{ color: "var(--text-secondary)" }}>
-                We believe the best design decisions are informed by what's worked before. Our
-                tools help teams find those precedents in seconds, not hours.
-              </p>
-            </div>
+          <div style={{ maxWidth: "720px" }}>
+            <h2 className="heading-m" style={{ marginBottom: "24px" }}>
+              Why we're building this
+            </h2>
+            <p className="body-l" style={{ marginBottom: "16px" }}>
+              Architecture has incredible institutional knowledge—locked in folders and PDFs.
+              We're turning that into something searchable, evidence-based, and eventually
+              verifiable against constraints.
+            </p>
+            <p className="body-m" style={{ color: "var(--text-secondary)" }}>
+              We believe the best design decisions are informed by what's worked before. Our
+              tools help teams find those precedents in seconds, not hours.
+            </p>
           </div>
         </section>
 
