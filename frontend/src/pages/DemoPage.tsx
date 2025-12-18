@@ -4,8 +4,14 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { usePageMeta } from "../lib/seo";
 import { trackLandingEvent } from "../lib/analytics";
 
-// Placeholder - replace with actual Loom video ID
-const LOOM_VIDEO_ID = ""; // TODO: Replace with actual Loom video ID
+// Video configuration - supports Google Drive or Loom
+const VIDEO_CONFIG = {
+  type: "gdrive" as "gdrive" | "loom",
+  // Google Drive file ID (from share URL)
+  gdriveId: "1Jq-DgxztZ5Yg3vQ18_c7g-rhhrxI-GsQ",
+  // Loom video ID (optional, for when you record the Loom)
+  loomId: "",
+};
 const CALENDLY_URL = "https://calendly.com/archipedia/pilot"; // TODO: Replace
 
 export function DemoPage() {
@@ -136,15 +142,26 @@ export function DemoPage() {
               marginBottom: "48px",
             }}
           >
-            {loomLoaded && LOOM_VIDEO_ID ? (
-              <iframe
-                src={`https://www.loom.com/embed/${LOOM_VIDEO_ID}?autoplay=1`}
-                frameBorder="0"
-                allowFullScreen
-                allow="autoplay"
-                style={{ width: "100%", height: "100%" }}
-                title="Archipedia Demo"
-              />
+            {loomLoaded && (VIDEO_CONFIG.gdriveId || VIDEO_CONFIG.loomId) ? (
+              VIDEO_CONFIG.type === "gdrive" && VIDEO_CONFIG.gdriveId ? (
+                <iframe
+                  src={`https://drive.google.com/file/d/${VIDEO_CONFIG.gdriveId}/preview`}
+                  frameBorder="0"
+                  allowFullScreen
+                  allow="autoplay"
+                  style={{ width: "100%", height: "100%" }}
+                  title="Archipedia Demo"
+                />
+              ) : (
+                <iframe
+                  src={`https://www.loom.com/embed/${VIDEO_CONFIG.loomId}?autoplay=1`}
+                  frameBorder="0"
+                  allowFullScreen
+                  allow="autoplay"
+                  style={{ width: "100%", height: "100%" }}
+                  title="Archipedia Demo"
+                />
+              )
             ) : (
               <div
                 className="w-full h-full flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
@@ -170,15 +187,13 @@ export function DemoPage() {
                       marginBottom: "12px",
                     }}
                   >
-                    {LOOM_VIDEO_ID ? "Click to play" : "Video coming soon"}
+                    Click to play
                   </div>
                   <div 
                     className="body-m" 
                     style={{ color: "var(--text-tertiary)" }}
                   >
-                    {LOOM_VIDEO_ID 
-                      ? "90-second walkthrough" 
-                      : "[Loom Video Placeholder - Add LOOM_VIDEO_ID]"}
+                    90-second walkthrough
                   </div>
                 </div>
               </div>
