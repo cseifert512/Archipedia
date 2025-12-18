@@ -12,7 +12,7 @@ const VIDEO_CONFIG = {
   // Loom video ID (optional, for when you record the Loom)
   loomId: "",
 };
-const CALENDLY_URL = "https://calendly.com/archipedia/pilot"; // TODO: Replace
+const CALENDLY_URL = "https://calendly.com/clayhseifert/30min";
 
 export function DemoPage() {
   const [, setLocation] = useLocation();

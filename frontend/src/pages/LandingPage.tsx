@@ -10,7 +10,7 @@ import { usePageMeta } from "../lib/seo";
 import { trackLandingEvent } from "../lib/analytics";
 
 // Placeholder constants - replace with real values
-const CALENDLY_URL = "https://calendly.com/archipedia/pilot"; // TODO: Replace
+const CALENDLY_URL = "https://calendly.com/clayhseifert/30min";
 // Video configuration - supports Google Drive or Loom
 const VIDEO_CONFIG = {
   type: "gdrive" as "gdrive" | "loom",
