@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Lock, Unlock, ArrowRight } from "lucide-react";
 import { Input } from "./ui/input";
 
@@ -10,11 +11,23 @@ interface PasswordGateProps {
 }
 
 export function PasswordGate({ children }: PasswordGateProps) {
+  const [, setLocation] = useLocation();
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
+
+  const handleRequestAccess = () => {
+    // Navigate to homepage and scroll to contact after a short delay
+    setLocation("/");
+    setTimeout(() => {
+      const contactSection = document.querySelector("#contact");
+      if (contactSection) {
+        contactSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 100);
+  };
 
   // Check if already unlocked
   useEffect(() => {
@@ -193,8 +206,8 @@ export function PasswordGate({ children }: PasswordGateProps) {
             >
               Don't have access yet?
             </p>
-            <a
-              href="/#contact"
+            <button
+              onClick={handleRequestAccess}
               className="inline-block hover:opacity-90 transition-all"
               style={{
                 fontFamily: "var(--font-primary)",
@@ -206,10 +219,11 @@ export function PasswordGate({ children }: PasswordGateProps) {
                 background: "transparent",
                 padding: "12px 20px",
                 color: "var(--text-primary)",
+                cursor: "pointer",
               }}
             >
               Request Access
-            </a>
+            </button>
           </div>
         </div>
       )}
