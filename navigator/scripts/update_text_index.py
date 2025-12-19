@@ -235,7 +235,7 @@ def main():
             "metadata": new_metadata
         }, f, indent=2, ensure_ascii=False)
     
-    print(f"✓ Saved to: {output_file}")
+    print(f"[OK] Saved to: {output_file}")
     
     # Show sample
     print("\nSample searchable text (first entry):")
