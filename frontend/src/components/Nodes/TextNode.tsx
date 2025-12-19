@@ -15,7 +15,7 @@ export const TextNode: React.FC<TextNodeProps> = ({
   selected,
   id
 }) => {
-  const { deleteNode, executeFromNode } = useCanvasStore();
+  const { deleteNode, executeFromNode, updateNode } = useCanvasStore();
   const [textValue, setTextValue] = useState(data.content || '');
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -206,7 +206,14 @@ export const TextNode: React.FC<TextNodeProps> = ({
         </div>
         <textarea
           value={textValue}
-          onChange={(e) => setTextValue(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            setTextValue(next);
+            if (id) {
+              // Keep the store in sync so workflow execution sees the latest content.
+              updateNode(id, { content: next });
+            }
+          }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           placeholder="Enter text content..."

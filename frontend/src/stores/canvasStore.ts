@@ -227,9 +227,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
             executionError: result.error,
           });
 
-          // Special-case: when an Image node returns projects, spawn a Precedent node once per query_id.
+          // Special-case: when a search node returns projects, spawn a Precedent node once per query_id
+          // and auto-wire it from the searching node to the results node.
           const thisNode = get().nodes.find(n => n.id === nodeId);
-          if (thisNode?.data?.type === 'image' && result.status === 'success') {
+          if ((thisNode?.data?.type === 'image' || thisNode?.data?.type === 'text') && result.status === 'success') {
             const projects = (result.outputs as any)?.projects;
             const queryId = (result.outputs as any)?.query_id;
             const alreadySpawned = (thisNode.data as any).lastSpawnQueryId && (thisNode.data as any).lastSpawnQueryId === queryId;
@@ -237,6 +238,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
               const pos = thisNode.position || { x: 0, y: 0 };
               const newNode = createPrecedentNode({ x: pos.x + 340, y: pos.y }, projects);
               get().addNodes([newNode]);
+              // Add a wire from search -> results
+              const edgeId = `e_${nodeId}_${newNode.id}_${queryId}`;
+              const edge: Edge = {
+                id: edgeId,
+                source: nodeId,
+                target: newNode.id,
+                sourceHandle: 'output',
+                targetHandle: 'input',
+              };
+              get().addEdges([edge]);
               get().updateNode(nodeId, { lastSpawnQueryId: queryId });
             }
           }

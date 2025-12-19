@@ -1,7 +1,7 @@
 import { Node, Edge } from 'reactflow';
 import { NodeData } from '../types/nodes';
 import { cacheManager } from './CacheManager';
-import { searchByImageFile, toAbsoluteUrl } from './navigatorApi';
+import { searchByImageFile, searchByText, toAbsoluteUrl } from './navigatorApi';
 import { PrecedentProject } from '../types/nodes';
 
 /**
@@ -257,10 +257,45 @@ async function executeTextNode(
   // Combine input with node content
   const output = inputText ? `${inputText}\n${content}` : content;
 
+  const q = (output || '').trim();
+  if (!q) {
+    return {
+      outputs: {
+        output: output,
+        text: output,
+        results: [],
+        projects: [],
+      },
+      status: 'success',
+    };
+  }
+
+  // Treat Text node as a text-search node: call Navigator /search/text
+  const topK = typeof (node.data as any).topK === 'number' ? (node.data as any).topK : 12;
+  const resp: any = await searchByText(q, { topK });
+  const results = Array.isArray(resp?.results) ? resp.results : [];
+
+  const projects: PrecedentProject[] = results
+    .filter((r: any) => r && (r.project_id || r.image_id))
+    .map((r: any) => ({
+      id: String(r.project_id || r.image_id || ''),
+      title: String(r.title || r.project_id || r.image_id || 'Result'),
+      thumbnail: toAbsoluteUrl(r.thumb_url) || '',
+      attributes: {
+        typology: r.typology ? String(r.typology) : undefined,
+        climate: r.climate_bin ? String(r.climate_bin) : undefined,
+        massing: r.massing_type ? String(r.massing_type) : undefined,
+      },
+    }));
+
   return {
     outputs: {
       output: output,
       text: output,
+      results,
+      projects,
+      query_id: resp?.query_id,
+      latency_ms: resp?.latency_ms,
     },
     status: 'success',
   };
