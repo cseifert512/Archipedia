@@ -258,7 +258,9 @@ async function executeTextNode(
   const output = inputText ? `${inputText}\n${content}` : content;
 
   const q = (output || '').trim();
+  console.log('[DEBUG executeTextNode] content:', content, 'q:', q);
   if (!q) {
+    console.log('[DEBUG executeTextNode] Empty query, returning early');
     return {
       outputs: {
         output: output,
@@ -271,6 +273,7 @@ async function executeTextNode(
   }
 
   // Treat Text node as a text-search node: call Navigator /search/text
+  console.log('[DEBUG executeTextNode] Calling searchByText with q:', q);
   const topK = typeof (node.data as any).topK === 'number' ? (node.data as any).topK : 12;
   const resp: any = await searchByText(q, { topK });
   const results = Array.isArray(resp?.results) ? resp.results : [];

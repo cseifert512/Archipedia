@@ -130,6 +130,8 @@ class FaissStore:
             with open(self.idmap_path, "r", encoding="utf-8") as f:
                 self._idmap = json.load(f)
             # Build a quick project_id -> thumb lookup for text search and hydration fallbacks
+            # Also index by shortened project_id (without _exteriors_/_interiors_/_diagrams_ suffix)
+            # so text search results can find thumbnails
             self._thumb_by_project = {}
             try:
                 for _, meta in self._idmap.items():
@@ -137,8 +139,17 @@ class FaissStore:
                         continue
                     pid = meta.get("project_id")
                     thumb = meta.get("thumb")
-                    if pid and thumb and pid not in self._thumb_by_project:
-                        self._thumb_by_project[pid] = thumb
+                    if pid and thumb:
+                        # Add full project_id
+                        if pid not in self._thumb_by_project:
+                            self._thumb_by_project[pid] = thumb
+                        # Also add shortened version (extract base project_id before _exteriors_/_interiors_/_diagrams_)
+                        for suffix in ("_exteriors_", "_interiors_", "_diagrams_"):
+                            if suffix in pid:
+                                short_pid = pid.split(suffix)[0]
+                                if short_pid and short_pid not in self._thumb_by_project:
+                                    self._thumb_by_project[short_pid] = thumb
+                                break
             except Exception:
                 # Never fail reload due to lookup-building
                 self._thumb_by_project = {}
@@ -231,7 +242,11 @@ class FaissStore:
         return out
 
     def thumb_for_project(self, project_id: str) -> Optional[str]:
-        """Best-effort thumbnail path for a project_id (may be missing on disk)."""
+        """Best-effort thumbnail path for a project_id (may be missing on disk).
+        
+        Supports both full project_ids (e.g., 'p_foo_123_exteriors_p_foo_123')
+        and shortened versions (e.g., 'p_foo_123') from text search.
+        """
         if not project_id:
             return None
         return self._thumb_by_project.get(project_id)

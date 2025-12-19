@@ -219,6 +219,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         edgesToUse,
         undefined,
         (nodeId, result) => {
+          console.log('[DEBUG executeFromNode] Node executed:', nodeId, 'status:', result.status, 'cached:', result.cached);
           // Always store execution metadata on the node so UI can reflect failures too.
           get().updateNode(nodeId, {
             executionStatus: result.status === 'success' ? 'success' :
