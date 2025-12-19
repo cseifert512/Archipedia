@@ -26,15 +26,16 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
       const node = nodes.find(n => n.id === id);
       if (node?.data) {
         const nodeData = node.data as any;
-        if (nodeData.executionResult) {
-          if (nodeData.executionResult.status === 'success') {
-            setStatus('success');
-            setResultCount(nodeData.executionResult.outputs?.count || 0);
-            setErrorMessage(null);
-          } else if (nodeData.executionResult.status === 'error') {
-            setStatus('error');
-            setErrorMessage(nodeData.executionResult.error || 'Execution failed');
-          }
+        // executionStatus is stored separately from executionResult (which is just outputs)
+        if (nodeData.executionStatus === 'success') {
+          setStatus('success');
+          setResultCount(nodeData.executionResult?.count || nodeData.executionResult?.results?.length || 0);
+          setErrorMessage(null);
+        } else if (nodeData.executionStatus === 'error') {
+          setStatus('error');
+          setErrorMessage(nodeData.executionError || 'Execution failed');
+        } else if (nodeData.executionStatus === 'running') {
+          setStatus('running');
         }
       }
     }
@@ -229,7 +230,7 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
             }}
           >
             <Play size={8} />
-            {status === 'running' ? 'RUNNING...' : 'RUN'}
+            RUN
           </button>
           <button
             onClick={(e) => {

@@ -203,10 +203,40 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       });
     }
 
+    // Find upstream nodes that have cached execution results
+    // These provide inputs to the nodes we're executing
+    const upstreamNodes = new Set<string>();
+    for (const targetId of downstreamNodes) {
+      const incomingEdges = edges.filter(e => e.target === targetId);
+      for (const edge of incomingEdges) {
+        if (!downstreamNodes.has(edge.source)) {
+          upstreamNodes.add(edge.source);
+        }
+      }
+    }
+
+    // Build pre-seeded results from upstream nodes with cached executionResult
+    const initialResults = new Map<string, NodeExecutionResult>();
+    for (const upstreamId of upstreamNodes) {
+      const upstreamNode = nodes.find(n => n.id === upstreamId);
+      if (upstreamNode?.data) {
+        const data = upstreamNode.data as any;
+        if (data.executionResult && data.executionStatus === 'success') {
+          initialResults.set(upstreamId, {
+            outputs: data.executionResult,
+            status: 'success',
+            cached: true,
+          });
+        }
+      }
+    }
+
     // Filter nodes to execute
     const nodesToExecute = nodes.filter(n => downstreamNodes.has(n.id));
+    // Include edges from upstream nodes to our nodes (for input gathering)
     const edgesToUse = edges.filter(e =>
-      downstreamNodes.has(e.source) && downstreamNodes.has(e.target)
+      (downstreamNodes.has(e.source) && downstreamNodes.has(e.target)) ||
+      (upstreamNodes.has(e.source) && downstreamNodes.has(e.target))
     );
 
     // Mark the starting node as running immediately so the UI reacts even if the executor fails early.
@@ -252,6 +282,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
               get().updateNode(nodeId, { lastSpawnQueryId: queryId });
             }
           }
+        },
+        {
+          useCache: false, // Force re-execution for debugging
+          parallelExecution: false,
+          initialResults, // Pre-seed with upstream node results
         }
       );
     } catch (error) {

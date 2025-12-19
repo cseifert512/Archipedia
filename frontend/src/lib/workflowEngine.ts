@@ -570,6 +570,7 @@ export async function executeWorkflow(
   options?: {
     useCache?: boolean;
     parallelExecution?: boolean;
+    initialResults?: Map<string, NodeExecutionResult>;
   }
 ): Promise<Map<string, NodeExecutionResult>> {
   const useCache = options?.useCache !== false; // Default to true
@@ -578,8 +579,8 @@ export async function executeWorkflow(
   // Sort nodes in execution order
   const sortedNodes = topologicalSort(nodes, edges);
 
-  // Store execution results
-  const results = new Map<string, NodeExecutionResult>();
+  // Store execution results - start with any pre-seeded results from upstream nodes
+  const results = new Map<string, NodeExecutionResult>(options?.initialResults || []);
 
   // Execute nodes in order (or in parallel when possible)
   if (parallelExecution) {
