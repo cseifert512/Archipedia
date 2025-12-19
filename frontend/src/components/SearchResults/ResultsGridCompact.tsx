@@ -43,6 +43,10 @@ export const ResultsGridCompact: React.FC<ResultsGridCompactProps> = ({
           key={project.id}
           draggable
           onDragStart={(e) => onDragStart(e, project)}
+          onDoubleClick={() => {
+            // Open project detail page in new tab
+            window.open(`/project/${project.id}`, '_blank');
+          }}
           className="group"
           style={{
             aspectRatio: '1',
