@@ -532,6 +532,89 @@ def list_projects(_: bool = Depends(require_token)):
         })
     return projects
 
+
+def extract_base_project_id(project_id: str) -> str:
+    """Extract base project ID by removing _exteriors_, _interiors_, _diagrams_ suffixes."""
+    for suffix in ["_exteriors_", "_interiors_", "_diagrams_"]:
+        if suffix in project_id:
+            # Take the part before the suffix
+            return project_id.split(suffix)[0]
+    return project_id
+
+
+@app.get("/projects/{project_id}")
+def get_project(project_id: str, _: bool = Depends(require_token)):
+    """Get single project details by ID."""
+    store = get_store()
+    if store._projects is None or store._projects.empty:
+        raise HTTPException(status_code=404, detail="No project data available")
+    
+    df = store._projects
+    
+    # Try exact match first
+    matching = df[df['project_id'] == project_id]
+    
+    # If not found, try with base project ID (strip _exteriors_, _interiors_, _diagrams_)
+    if matching.empty:
+        base_id = extract_base_project_id(project_id)
+        if base_id != project_id:
+            matching = df[df['project_id'] == base_id]
+    
+    # Still not found? Try prefix matching
+    if matching.empty:
+        base_id = extract_base_project_id(project_id)
+        matching = df[df['project_id'].str.startswith(base_id)]
+    
+    if matching.empty:
+        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+    
+    row = matching.iloc[0].to_dict()
+    
+    # Parse image_ids
+    image_ids = []
+    if row.get('image_ids') and pd.notna(row['image_ids']):
+        raw = str(row['image_ids'])
+        # Handle JSON array format
+        if raw.startswith('['):
+            try:
+                image_ids = json.loads(raw.replace("'", '"'))
+            except:
+                image_ids = [x.strip() for x in raw.split('|') if x.strip()]
+        else:
+            image_ids = [x.strip() for x in raw.split('|') if x.strip()]
+    
+    # Parse tags
+    tags = []
+    if row.get('tags') and pd.notna(row['tags']):
+        raw = str(row['tags'])
+        if raw.startswith('['):
+            try:
+                tags = json.loads(raw.replace("'", '"'))
+            except:
+                tags = [x.strip() for x in raw.split('|') if x.strip()]
+        else:
+            tags = [x.strip() for x in raw.split('|') if x.strip()]
+    
+    return {
+        "project_id": str(row.get('project_id', '')),
+        "title": str(row.get('title', '')),
+        "country": str(row.get('country', '')),
+        "climate_bin": str(row.get('climate_bin', '')),
+        "typology": str(row.get('typology', '')),
+        "massing_type": str(row.get('massing_type', '')),
+        "wwr_band": str(row.get('wwr_band', '')),
+        "image_ids": image_ids,
+        "tags": tags,
+        "architect": str(row.get('architect', '')) if row.get('architect') and pd.notna(row.get('architect')) else None,
+        "city": str(row.get('city', '')) if row.get('city') and pd.notna(row.get('city')) else None,
+        "year_completed": int(row['year_completed']) if row.get('year_completed') and pd.notna(row.get('year_completed')) else None,
+        "building_area_sqm": float(row['building_area_sqm']) if row.get('building_area_sqm') and pd.notna(row.get('building_area_sqm')) else None,
+        "floors_above_ground": int(row['floors_above_ground']) if row.get('floors_above_ground') and pd.notna(row.get('floors_above_ground')) else None,
+        "description": str(row.get('description', '')) if row.get('description') and pd.notna(row.get('description')) else None,
+        "materials": row.get('materials') if row.get('materials') and pd.notna(row.get('materials')) else None,
+    }
+
+
 @app.get("/projects/{project_id}/images")
 def list_project_images(project_id: str, _: bool = Depends(require_token)):
     images_dir = os.path.join(DATA_DIR, "images", project_id)

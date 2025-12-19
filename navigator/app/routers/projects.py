@@ -24,14 +24,38 @@ def set_metadata(metadata: pd.DataFrame):
     global _metadata
     _metadata = metadata
 
+def extract_base_project_id(project_id: str) -> str:
+    """Extract base project ID by removing _exteriors_, _interiors_, _diagrams_ suffixes."""
+    for suffix in ["_exteriors_", "_interiors_", "_diagrams_"]:
+        if suffix in project_id:
+            # Take the part before the suffix
+            base_id = project_id.split(suffix)[0]
+            return base_id
+    return project_id
+
+
 @router.get("/projects/{project_id}", response_model=ProjectCard)
 async def get_project(project_id: str):
     """Get project details."""
     try:
         metadata = get_metadata()
         
-        # Find project
+        # Find project - try exact match first
         project_row = metadata[metadata['project_id'] == project_id]
+        
+        # If not found, try with base project ID (without _exteriors_, _interiors_, _diagrams_)
+        if project_row.empty:
+            base_id = extract_base_project_id(project_id)
+            if base_id != project_id:
+                project_row = metadata[metadata['project_id'] == base_id]
+        
+        # Still not found? Try prefix matching
+        if project_row.empty:
+            base_id = extract_base_project_id(project_id)
+            matching_rows = metadata[metadata['project_id'].str.startswith(base_id)]
+            if not matching_rows.empty:
+                project_row = matching_rows.head(1)
+        
         if project_row.empty:
             raise HTTPException(status_code=404, detail="Project not found")
         
