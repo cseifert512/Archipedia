@@ -43,9 +43,13 @@ export const ResultsGridCompact: React.FC<ResultsGridCompactProps> = ({
           key={project.id}
           draggable
           onDragStart={(e) => onDragStart(e, project)}
-          onDoubleClick={() => {
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
             // Open project detail page in new tab
-            window.open(`/project/${project.id}`, '_blank');
+            const projectId = project.id || project.name || 'unknown';
+            console.log('[DEBUG] Double-click opening project:', projectId);
+            window.open(`/project/${encodeURIComponent(projectId)}`, '_blank');
           }}
           className="group"
           style={{
@@ -68,7 +72,7 @@ export const ResultsGridCompact: React.FC<ResultsGridCompactProps> = ({
             e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)';
           }}
         >
-          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          <div style={{ position: 'relative', width: '100%', height: '100%', pointerEvents: 'none' }}>
             {project.url || project.imageUrl ? (
               <img
                 src={project.url || project.imageUrl}
@@ -77,6 +81,7 @@ export const ResultsGridCompact: React.FC<ResultsGridCompactProps> = ({
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
+                  pointerEvents: 'none',
                 }}
                 draggable={false}
               />
@@ -147,6 +152,7 @@ export const ResultsGridCompact: React.FC<ResultsGridCompactProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'flex-end',
+                pointerEvents: 'none',
               }}
             >
               <h4
