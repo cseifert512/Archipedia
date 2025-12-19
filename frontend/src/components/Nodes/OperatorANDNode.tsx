@@ -112,8 +112,8 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
     <div
       className="rounded-lg overflow-visible cursor-move group transition-all"
       style={{
-        width: isExpanded ? '400px' : '120px',
-        minHeight: isExpanded ? '500px' : '80px',
+        width: isExpanded ? '400px' : '180px',
+        minHeight: isExpanded ? '500px' : '90px',
         backgroundColor: '#FFFFFF',
         border: selected ? '2px solid #FF9F43' : '1px solid rgba(0,0,0,0.1)',
         borderRadius: isExpanded ? '12px' : '8px',
