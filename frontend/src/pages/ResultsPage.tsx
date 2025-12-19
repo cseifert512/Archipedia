@@ -55,7 +55,71 @@ export function ResultsPage() {
   const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null);
   
   const { searchResults, setSearchResults, setSearchQuery: setStoreQuery } = useSearchStore();
-  const { nodes, addNodes, executeWorkflow } = useCanvasStore();
+  const { nodes, addNodes, executeWorkflow, selectedNodes } = useCanvasStore();
+  
+  // Get selected node's execution results (if any)
+  const selectedNode = useMemo(() => {
+    if (selectedNodes.length === 0) return null;
+    return nodes.find((n) => n.id === selectedNodes[0]) || null;
+  }, [selectedNodes, nodes]);
+  
+  // Check if selected node has results to display
+  const selectedNodeResults = useMemo(() => {
+    if (!selectedNode) return null;
+    const data = selectedNode.data as any;
+    // Check for projects array (from Precedent nodes or execution results)
+    if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
+      return data.projects.map((p: any): SearchResult => ({
+        id: p.id || p.project_id || '',
+        name: p.title || p.name || 'Project',
+        imageUrl: p.thumbnail || p.thumb_url || '',
+        url: p.thumbnail || p.thumb_url || '',
+        buildingType: p.attributes?.typology || p.typology || '',
+        climate: p.attributes?.climate ? [p.attributes.climate] : [],
+        matchPercentage: 90,
+        similarityScore: 0.9,
+        visualScore: 0.9,
+        spatialScore: 0.9,
+        attributeScore: 0.9,
+        typology: p.attributes?.typology || p.typology || '',
+      }));
+    }
+    // Check for executionResult with results array
+    if (data.executionResult?.results && Array.isArray(data.executionResult.results)) {
+      return data.executionResult.results.map((r: any, idx: number): SearchResult => ({
+        id: String(r.project_id || `result_${idx}`),
+        name: String(r.title || r.project_id || 'Result'),
+        imageUrl: r.thumb_url ? toAbsoluteUrl(r.thumb_url) : undefined,
+        url: r.thumb_url ? toAbsoluteUrl(r.thumb_url) : undefined,
+        buildingType: r.typology || '',
+        climate: r.climate_bin ? [r.climate_bin] : [],
+        matchPercentage: Math.max(10, 100 - idx),
+        similarityScore: r.score ?? (1 - (r.distance ?? 0.5)),
+        visualScore: 0.8,
+        spatialScore: 0.8,
+        attributeScore: 0.8,
+        typology: r.typology || '',
+      }));
+    }
+    // Check for executionResult with projects array
+    if (data.executionResult?.projects && Array.isArray(data.executionResult.projects)) {
+      return data.executionResult.projects.map((p: any): SearchResult => ({
+        id: p.id || p.project_id || '',
+        name: p.title || p.name || 'Project',
+        imageUrl: p.thumbnail || p.thumb_url || '',
+        url: p.thumbnail || p.thumb_url || '',
+        buildingType: p.attributes?.typology || p.typology || '',
+        climate: p.attributes?.climate ? [p.attributes.climate] : [],
+        matchPercentage: 90,
+        similarityScore: 0.9,
+        visualScore: 0.9,
+        spatialScore: 0.9,
+        attributeScore: 0.9,
+        typology: p.attributes?.typology || p.typology || '',
+      }));
+    }
+    return null;
+  }, [selectedNode]);
 
   const performTextSearch = useCallback(async (query: string) => {
     const q = query.trim();
@@ -656,8 +720,8 @@ export function ResultsPage() {
           </div>
         </div>
 
-        {/* Section 3: Results Grid - Only show when user has searched */}
-        {hasSearched && (
+        {/* Section 3: Results Grid - Show when user has searched OR when a node with results is selected */}
+        {(hasSearched || selectedNodeResults) && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, height: '50%', flexShrink: 0 }}>
             <div
               style={{
@@ -672,25 +736,35 @@ export function ResultsPage() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>Ranked Results {!isSearching && `(${filteredResults.length})`}</span>
-                {isSearching && (
-                  <div
-                    style={{
-                      width: '12px',
-                      height: '12px',
-                      border: '2px solid rgba(0,0,0,0.1)',
-                      borderTop: '2px solid #64B5FF',
-                      borderRadius: '50%',
-                      animation: 'spin 0.8s linear infinite',
-                    }}
-                  />
+                {selectedNodeResults ? (
+                  <span>Node Results ({selectedNodeResults.length})</span>
+                ) : (
+                  <>
+                    <span>Ranked Results {!isSearching && `(${filteredResults.length})`}</span>
+                    {isSearching && (
+                      <div
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          border: '2px solid rgba(0,0,0,0.1)',
+                          borderTop: '2px solid #64B5FF',
+                          borderRadius: '50%',
+                          animation: 'spin 0.8s linear infinite',
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </div>
-              {currentSearchQuery && !isSearching && (
+              {selectedNodeResults && selectedNode ? (
+                <span style={{ fontSize: '9px', color: 'rgba(0,0,0,0.5)', fontStyle: 'italic' }}>
+                  {(selectedNode.data as any).type === 'precedent' ? 'Precedent Node' : `${(selectedNode.data as any).type} node`}
+                </span>
+              ) : currentSearchQuery && !isSearching ? (
                 <span style={{ fontSize: '9px', color: 'rgba(0,0,0,0.5)', fontStyle: 'italic' }}>
                   "{currentSearchQuery}"
                 </span>
-              )}
+              ) : null}
             </div>
             <div
               style={{
@@ -698,11 +772,11 @@ export function ResultsPage() {
                 overflowY: 'auto',
                 padding: '12px 16px',
                 display: 'flex',
-                alignItems: isSearching ? 'center' : 'flex-start',
-                justifyContent: isSearching ? 'center' : 'flex-start',
+                alignItems: isSearching && !selectedNodeResults ? 'center' : 'flex-start',
+                justifyContent: isSearching && !selectedNodeResults ? 'center' : 'flex-start',
               }}
             >
-              {isSearching ? (
+              {isSearching && !selectedNodeResults ? (
                 <div style={{ textAlign: 'center' }}>
                   <div
                     style={{
@@ -727,7 +801,7 @@ export function ResultsPage() {
                 </div>
               ) : (
                 <ResultsGridCompact
-                  projects={filteredResults}
+                  projects={selectedNodeResults || filteredResults}
                   weights={fusionWeights}
                   onDragStart={handleDragStart}
                 />

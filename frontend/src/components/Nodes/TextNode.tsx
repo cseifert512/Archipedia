@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { TextNodeData } from '../../types/nodes';
-import { X, Play } from 'lucide-react';
+import { X, Play, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 
 interface TextNodeProps {
@@ -28,9 +28,17 @@ export const TextNode: React.FC<TextNodeProps> = ({
   const handleRun = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (id) {
+      // Make the UI responsive immediately
+      updateNode(id, { executionStatus: 'running', executionError: undefined });
       await executeFromNode(id);
     }
   };
+
+  // Execution status
+  const status = (data as any).executionStatus as string | undefined;
+  const err = ((data as any).executionError as string | undefined) || undefined;
+  const results = (data as any).executionResult?.results;
+  const resultCount = Array.isArray(results) ? results.length : 0;
 
   // Calculate positions for connection handles
   const inputHandleY = 60; // After header
@@ -121,6 +129,10 @@ export const TextNode: React.FC<TextNodeProps> = ({
           TEXT
         </h3>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          {/* Status icon */}
+          {status === 'running' && <Loader2 size={14} className="animate-spin" />}
+          {status === 'error' && <AlertTriangle size={14} />}
+          {status === 'success' && <CheckCircle2 size={14} />}
           <button
             onClick={handleRun}
             onMouseDown={(e) => e.stopPropagation()}
@@ -239,6 +251,47 @@ export const TextNode: React.FC<TextNodeProps> = ({
             e.target.style.background = '#fafafa';
           }}
         />
+
+        {/* Execution summary / errors */}
+        {status === 'error' && (
+          <div
+            style={{
+              marginTop: '10px',
+              padding: '8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255,0,0,0.25)',
+              backgroundColor: 'rgba(255,0,0,0.06)',
+              fontFamily: 'var(--font-primary)',
+              fontSize: '10px',
+              color: 'rgba(0,0,0,0.8)',
+              lineHeight: 1.35,
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: '4px' }}>Run failed</div>
+            <div style={{ opacity: 0.85 }}>{err || 'Unknown error'}</div>
+            <div style={{ opacity: 0.6, marginTop: '6px' }}>
+              Tip: make sure the backend is running on <code>http://localhost:8000</code> (or set <code>VITE_API_BASE_URL</code>).
+            </div>
+          </div>
+        )}
+
+        {status === 'success' && resultCount > 0 && (
+          <div
+            style={{
+              marginTop: '10px',
+              padding: '8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(0,0,0,0.08)',
+              backgroundColor: 'rgba(245, 241, 232, 0.3)',
+              fontFamily: 'var(--font-primary)',
+              fontSize: '10px',
+              color: 'rgba(0,0,0,0.75)',
+              textAlign: 'center',
+            }}
+          >
+            Found {resultCount} matching projects
+          </div>
+        )}
       </section>
     </div>
   );
