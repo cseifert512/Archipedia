@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import { OperatorANDNodeData } from '../../types/nodes';
-import { Circle, Plus, X, ChevronDown, ChevronUp, Play } from 'lucide-react';
+import { Circle, Plus, X, ChevronDown, ChevronUp, Play, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 
 interface OperatorANDNodeProps {
@@ -15,12 +15,42 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
   selected,
   id,
 }) => {
-  const { deleteNode, executeFromNode } = useCanvasStore();
+  const { deleteNode, executeFromNode, nodes } = useCanvasStore();
+  const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [resultCount, setResultCount] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Watch for execution results
+  useEffect(() => {
+    if (id) {
+      const node = nodes.find(n => n.id === id);
+      if (node?.data) {
+        const nodeData = node.data as any;
+        if (nodeData.executionResult) {
+          if (nodeData.executionResult.status === 'success') {
+            setStatus('success');
+            setResultCount(nodeData.executionResult.outputs?.count || 0);
+            setErrorMessage(null);
+          } else if (nodeData.executionResult.status === 'error') {
+            setStatus('error');
+            setErrorMessage(nodeData.executionResult.error || 'Execution failed');
+          }
+        }
+      }
+    }
+  }, [id, nodes]);
 
   const handleRun = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (id) {
-      await executeFromNode(id);
+      setStatus('running');
+      setErrorMessage(null);
+      try {
+        await executeFromNode(id);
+      } catch (err) {
+        setStatus('error');
+        setErrorMessage(err instanceof Error ? err.message : 'Execution failed');
+      }
     }
   };
   const [isExpanded, setIsExpanded] = useState(false);
@@ -164,36 +194,42 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
           </span>
         </div>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          {status === 'running' && <Loader2 size={14} className="animate-spin" color="#000" />}
+          {status === 'error' && <AlertTriangle size={14} color="#ef4444" />}
+          {status === 'success' && <CheckCircle2 size={14} color="#22c55e" />}
           <button
             onClick={handleRun}
             onMouseDown={(e) => e.stopPropagation()}
+            disabled={status === 'running'}
             style={{
               background: 'rgba(0,0,0,0.05)',
               border: 'none',
               borderRadius: '3px',
-              cursor: 'pointer',
+              cursor: status === 'running' ? 'not-allowed' : 'pointer',
               padding: '2px 6px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '2px',
-              opacity: 0.7,
+              opacity: status === 'running' ? 0.5 : 0.7,
               transition: 'opacity 0.2s',
               fontFamily: 'var(--font-primary)',
               fontSize: '8px',
               color: '#000000',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '1';
-              e.currentTarget.style.background = 'rgba(0,0,0,0.1)';
+              if (status !== 'running') {
+                e.currentTarget.style.opacity = '1';
+                e.currentTarget.style.background = 'rgba(0,0,0,0.1)';
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '0.7';
+              e.currentTarget.style.opacity = status === 'running' ? '0.5' : '0.7';
               e.currentTarget.style.background = 'rgba(0,0,0,0.05)';
             }}
           >
             <Play size={8} />
-            RUN
+            {status === 'running' ? 'RUNNING...' : 'RUN'}
           </button>
           <button
             onClick={(e) => {
@@ -257,6 +293,16 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
           <div style={{ fontFamily: 'var(--font-primary)', fontSize: '8px', color: 'rgba(0,0,0,0.5)', textAlign: 'center' }}>
             {inputs.length} inputs
           </div>
+          {status === 'error' && errorMessage && (
+            <div style={{ fontFamily: 'var(--font-primary)', fontSize: '8px', color: '#ef4444', textAlign: 'center' }}>
+              {errorMessage}
+            </div>
+          )}
+          {status === 'success' && resultCount > 0 && (
+            <div style={{ fontFamily: 'var(--font-primary)', fontSize: '8px', color: '#22c55e', textAlign: 'center' }}>
+              {resultCount} results
+            </div>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();

@@ -166,6 +166,9 @@ export async function executeNode(
       case 'collection':
         return executeCollectionNode(node, context);
 
+      case 'operatorAND':
+        return executeOperatorANDNode(node, context);
+
       default:
         return {
           outputs: { output: context.inputs },
@@ -413,6 +416,121 @@ async function executeOverseerNode(
       output: childTasks,
       tasks: childTasks,
       status: data.status,
+    },
+    status: 'success',
+  };
+}
+
+/**
+ * Execute operator AND node - combines/intersects results from multiple inputs
+ */
+async function executeOperatorANDNode(
+  node: Node<NodeData>,
+  context: NodeExecutionContext
+): Promise<NodeExecutionResult> {
+  const data = node.data as any;
+  const logic = data.logic || 'weightedSum';
+  const inputData = data.inputData || [];
+
+  // Get all input results from connected nodes
+  const allInputs = Object.entries(context.inputs);
+
+  if (allInputs.length === 0) {
+    return {
+      outputs: { output: [], results: [] },
+      status: 'error',
+      error: 'No inputs connected. Connect search nodes to combine results.',
+    };
+  }
+
+  // Extract results arrays from each input
+  const inputResultSets: Array<{ weight: number; results: any[] }> = [];
+
+  for (let i = 0; i < allInputs.length; i++) {
+    const [, inputValue] = allInputs[i];
+    const weight = inputData[i]?.weight || (100 / allInputs.length);
+
+    // Handle different input formats
+    let results: any[] = [];
+    if (Array.isArray(inputValue)) {
+      results = inputValue;
+    } else if (inputValue?.results && Array.isArray(inputValue.results)) {
+      results = inputValue.results;
+    } else if (inputValue?.output && Array.isArray(inputValue.output)) {
+      results = inputValue.output;
+    }
+
+    inputResultSets.push({ weight, results });
+  }
+
+  // Build a map of project_id -> aggregated score data
+  const projectScores = new Map<string, { 
+    project: any; 
+    scores: number[]; 
+    weights: number[];
+    count: number;
+  }>();
+
+  for (const { weight, results } of inputResultSets) {
+    for (const result of results) {
+      const projectId = result.project_id || result.id || result.image_id;
+      if (!projectId) continue;
+
+      const score = result.score ?? result.similarity ?? (1 - (result.distance || 0));
+
+      if (projectScores.has(projectId)) {
+        const existing = projectScores.get(projectId)!;
+        existing.scores.push(score);
+        existing.weights.push(weight);
+        existing.count++;
+      } else {
+        projectScores.set(projectId, {
+          project: result,
+          scores: [score],
+          weights: [weight],
+          count: 1,
+        });
+      }
+    }
+  }
+
+  // Calculate combined scores based on logic
+  const combinedResults: any[] = [];
+  const totalInputs = inputResultSets.length;
+
+  for (const [projectId, data] of projectScores.entries()) {
+    // For AND logic, only include projects that appear in ALL inputs
+    if (data.count < totalInputs) continue;
+
+    let combinedScore: number;
+
+    if (logic === 'product') {
+      // Product of all scores
+      combinedScore = data.scores.reduce((acc, s) => acc * s, 1);
+    } else {
+      // Weighted sum (default)
+      const totalWeight = data.weights.reduce((a, b) => a + b, 0);
+      combinedScore = data.scores.reduce((acc, s, i) => {
+        return acc + (s * (data.weights[i] / totalWeight));
+      }, 0);
+    }
+
+    combinedResults.push({
+      ...data.project,
+      project_id: projectId,
+      score: combinedScore,
+      combined_from: data.count,
+    });
+  }
+
+  // Sort by combined score descending
+  combinedResults.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  return {
+    outputs: {
+      output: combinedResults,
+      results: combinedResults,
+      count: combinedResults.length,
     },
     status: 'success',
   };
