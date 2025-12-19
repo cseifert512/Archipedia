@@ -607,26 +607,11 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
             if body.strict:
                 continue
         
-        # Try to get thumbnail from faiss store's projects
-        thumb_url = r.get("thumb_url")
-        if not thumb_url and faiss_store._projects is not None:
-            hit = faiss_store._projects[faiss_store._projects["project_id"] == project_id]
-            if not hit.empty:
-                row = hit.iloc[0]
-                # Construct thumbnail URL from first image
-                image_ids_raw = row.get("image_ids", "")
-                if image_ids_raw and str(image_ids_raw).strip():
-                    try:
-                        image_ids = json.loads(str(image_ids_raw).replace("'", '"'))
-                        if image_ids:
-                            first_img = image_ids[0]
-                            # Extract just the filename part
-                            parts = first_img.split("_")
-                            if len(parts) > 2:
-                                fname = parts[-1] + ".jpg"
-                                thumb_url = f"/images/{project_id}/{project_id}_{fname}"
-                    except Exception:
-                        pass
+        # Try to get thumbnail - prefer R2 URLs from id_map (via faiss_store)
+        thumb_url = faiss_store.thumb_for_project(project_id)
+        # Fallback to text metadata's thumb_url if not in id_map
+        if not thumb_url:
+            thumb_url = r.get("thumb_url")
         
         result = {
             "rank": len(hydrated_results) + 1,

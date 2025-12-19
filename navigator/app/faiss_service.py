@@ -212,8 +212,9 @@ class FaissStore:
             # In production (Render), we may not ship the full image corpus. If we hard-drop results
             # when thumbnails are missing, *every* query looks empty. Instead, return the hit and
             # let the frontend render a placeholder when thumb_url is absent/unavailable.
+            # NOTE: If thumb_url is already an absolute URL (R2/CDN), skip the local file check.
             thumb_missing = False
-            if thumb_url:
+            if thumb_url and not thumb_url.startswith(("http://", "https://")):
                 thumb_path = os.path.join(self.data_dir, thumb_url.lstrip("/"))
                 if not os.path.isfile(thumb_path):
                     thumb_missing = True
