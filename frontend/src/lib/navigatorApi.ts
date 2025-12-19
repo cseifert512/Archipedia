@@ -87,4 +87,66 @@ export async function searchByImageFile(
   return (await res.json()) as NavigatorSearchFileResponse;
 }
 
+export interface TextSearchOptions {
+  topK?: number;
+  typology?: string;
+  climateBin?: string;
+  massingType?: string;
+  strict?: boolean;
+}
+
+export interface TextSearchResponse {
+  query_id?: string;
+  embed_latency_ms?: number;
+  latency_ms?: number;
+  query?: string;
+  filters?: Record<string, any>;
+  results: NavigatorSearchResult[];
+  debug?: Record<string, any>;
+}
+
+/**
+ * Search by natural language text query using semantic embeddings.
+ */
+export async function searchByText(
+  query: string,
+  options?: TextSearchOptions
+): Promise<TextSearchResponse> {
+  const base = getApiBaseUrl();
+  const topK = options?.topK ?? 12;
+
+  const body: Record<string, any> = {
+    query,
+    top_k: topK,
+    filters: {},
+    strict: options?.strict ?? false,
+  };
+
+  if (options?.typology) {
+    body.filters.typology = options.typology;
+  }
+  if (options?.climateBin) {
+    body.filters.climate_bin = options.climateBin;
+  }
+  if (options?.massingType) {
+    body.filters.massing_type = options.massingType;
+  }
+
+  const res = await fetch(`${base}/search/text`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Navigator /search/text failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return (await res.json()) as TextSearchResponse;
+}
+
 

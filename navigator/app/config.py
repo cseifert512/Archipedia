@@ -10,6 +10,17 @@ class Settings(BaseSettings):
     model_name: str = Field(default="vit_base_patch14_dinov2", env="MODEL_NAME")
     emb_dim: int = Field(default=768, env="EMB_DIM")
     
+    # OpenAI settings (for text search)
+    openai_api_key: str | None = Field(default=None, env="OPENAI_API_KEY")
+    openai_embedding_model: str = Field(default="text-embedding-3-small", env="OPENAI_EMBEDDING_MODEL")
+    
+    # Cloudflare R2 settings (for image hosting)
+    r2_account_id: str | None = Field(default=None, env="R2_ACCOUNT_ID")
+    r2_access_key_id: str | None = Field(default=None, env="R2_ACCESS_KEY_ID")
+    r2_secret_access_key: str | None = Field(default=None, env="R2_SECRET_ACCESS_KEY")
+    r2_bucket_name: str = Field(default="archipedia-images", env="R2_BUCKET_NAME")
+    r2_public_url: str | None = Field(default=None, env="R2_PUBLIC_URL")
+    
     # FAISS settings
     faiss_nlist: int = Field(default=4096, env="FAISS_NLIST")
     faiss_m: int = Field(default=16, env="FAISS_M")

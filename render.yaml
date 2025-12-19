@@ -28,6 +28,10 @@ services:
         value: "true"
       - key: DISABLE_INDEX_WARMUP
         value: "true"
+      - key: OPENAI_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: R2_PUBLIC_URL
+        sync: false  # Set manually after R2 bucket creation
 
   - type: web
     name: arch-circare-ui

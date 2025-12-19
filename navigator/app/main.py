@@ -18,6 +18,7 @@ def l2n(x: np.ndarray) -> np.ndarray:
 from app.session import SessionStore, generate_query_id, compute_weight_nudges, apply_weight_nudges
 from app.models import Feedback, Weights
 from app.config import settings
+from app.services.text_embedder import get_text_index, embed_text
 
 # Spatial feature computation imports
 try:
@@ -99,6 +100,14 @@ def get_session_store() -> SessionStore:
     if _session_store is None:
         _session_store = SessionStore(DATA_DIR)
     return _session_store
+
+_text_index = None
+
+def get_text_index_store():
+    global _text_index
+    if _text_index is None:
+        _text_index = get_text_index(DATA_DIR)
+    return _text_index
 
 
 def require_token(authorization: str | None = Header(None)):
@@ -245,6 +254,12 @@ class SearchById(BaseModel):
 class SearchByVector(BaseModel):
     vector: List[float]
     top_k: int = 12
+
+class SearchByText(BaseModel):
+    query: str
+    top_k: int = 12
+    filters: Filters = Filters()
+    strict: bool = False
 
 
 class EnterpriseLead(BaseModel):
@@ -546,6 +561,127 @@ def search_vector(body: SearchByVector, _: bool = Depends(require_token)):
     D, I = st.search(q, body.top_k)
     ms = int((time.time() - t0) * 1000)
     return {"latency_ms": ms, "results": st.results_payload(D, I)}
+
+@app.post("/search/text")
+def search_text(body: SearchByText, _: bool = Depends(require_token)):
+    """
+    Semantic text search using OpenAI embeddings.
+    Searches project titles, typologies, descriptions, and metadata.
+    """
+    if not body.query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+    
+    query_id = generate_query_id()
+    text_index = get_text_index_store()
+    faiss_store = get_store()
+    
+    # Check if text index is ready
+    if not text_index.is_ready():
+        raise HTTPException(
+            status_code=503, 
+            detail="Text search index not available. Run embed_text.py to generate embeddings."
+        )
+    
+    t0 = time.time()
+    
+    # Search text index
+    text_results = text_index.search(body.query, top_k=body.top_k * 3)  # Get more for filtering
+    
+    embed_ms = int((time.time() - t0) * 1000)
+    
+    # Hydrate results with full project metadata and thumbnail URLs
+    hydrated_results = []
+    for r in text_results:
+        project_id = r.get("project_id")
+        if not project_id:
+            continue
+        
+        # Apply filters if specified
+        if body.filters.typology and r.get("typology") != body.filters.typology:
+            if body.strict:
+                continue
+        if body.filters.climate_bin and r.get("climate_bin") != body.filters.climate_bin:
+            if body.strict:
+                continue
+        if body.filters.massing_type and r.get("massing_type") != body.filters.massing_type:
+            if body.strict:
+                continue
+        
+        # Try to get thumbnail from faiss store's projects
+        thumb_url = r.get("thumb_url")
+        if not thumb_url and faiss_store._projects is not None:
+            hit = faiss_store._projects[faiss_store._projects["project_id"] == project_id]
+            if not hit.empty:
+                row = hit.iloc[0]
+                # Construct thumbnail URL from first image
+                image_ids_raw = row.get("image_ids", "")
+                if image_ids_raw and str(image_ids_raw).strip():
+                    try:
+                        image_ids = json.loads(str(image_ids_raw).replace("'", '"'))
+                        if image_ids:
+                            first_img = image_ids[0]
+                            # Extract just the filename part
+                            parts = first_img.split("_")
+                            if len(parts) > 2:
+                                fname = parts[-1] + ".jpg"
+                                thumb_url = f"/images/{project_id}/{project_id}_{fname}"
+                    except Exception:
+                        pass
+        
+        result = {
+            "rank": len(hydrated_results) + 1,
+            "score": r.get("score", 0.0),
+            "distance": 1.0 - r.get("score", 0.0),  # Convert similarity to distance
+            "project_id": project_id,
+            "image_id": f"text_{project_id}",  # Synthetic image_id for compatibility
+            "title": r.get("title"),
+            "country": r.get("country"),
+            "typology": r.get("typology"),
+            "climate_bin": r.get("climate_bin"),
+            "massing_type": r.get("massing_type"),
+            "thumb_url": thumb_url,
+        }
+        
+        hydrated_results.append(result)
+        
+        if len(hydrated_results) >= body.top_k:
+            break
+    
+    ms = int((time.time() - t0) * 1000)
+    
+    return {
+        "query_id": query_id,
+        "embed_latency_ms": embed_ms,
+        "latency_ms": ms,
+        "query": body.query,
+        "filters": body.filters.model_dump(),
+        "results": hydrated_results,
+        "debug": {
+            "text_search": True,
+            "index_ready": text_index.is_ready(),
+            "raw_results": len(text_results),
+            "filtered_results": len(hydrated_results),
+        }
+    }
+
+@app.get("/search/text")
+def search_text_get(
+    q: str = Query(..., description="Search query text"),
+    top_k: int = 12,
+    typology: Optional[str] = None,
+    climate_bin: Optional[str] = None,
+    massing_type: Optional[str] = None,
+    strict: bool = False,
+    _: bool = Depends(require_token),
+):
+    """GET version of text search for easy testing."""
+    body = SearchByText(
+        query=q,
+        top_k=top_k,
+        filters=Filters(typology=typology, climate_bin=climate_bin, massing_type=massing_type),
+        strict=strict
+    )
+    return search_text(body, _)
 
 @app.get("/search/url")
 def search_url(

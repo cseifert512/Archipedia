@@ -14,6 +14,7 @@ import {
 import { useBoardStore } from '../stores/boardStore';
 import { mockProjects } from '../lib/mockData';
 import { toast } from 'sonner';
+import { searchByText, searchByImageFile, toAbsoluteUrl } from '../lib/navigatorApi';
 
 type SortOption = 'best' | 'visual' | 'semantic';
 
@@ -100,38 +101,69 @@ export function ClassicSearchPage() {
       setUploadedImage(searchImage);
       setEmphasis(searchEmphasis);
 
-      // Simulate API call with mock data
-      // In production, this would call POST /search
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      try {
+        let apiResults: any[] = [];
 
-      // Generate mock results from mockProjects with multiple images per project
-      const additionalImageUrls = [
-        'https://images.unsplash.com/photo-1545558014-8692077e9b5c?w=600',
-        'https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=600',
-        'https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?w=600',
-        'https://images.unsplash.com/photo-1486718448742-163732cd1544?w=600',
-      ];
-
-      const mockResults: SearchResultData[] = mockProjects.map((project, index) => {
-        const baseScore = 0.95 - index * 0.015;
-        const visualWeight = searchEmphasis === 'visual' ? 0.8 : searchEmphasis === 'semantic' ? 0.2 : 0.5;
-        const finalScore = Math.max(0.3, baseScore * (0.8 + visualWeight * 0.2));
-
-        // Generate 3-5 images per project
-        const numImages = 3 + (index % 3);
-        const projectImages: ProjectImage[] = [
-          { image_id: `img_${project.id}_01`, thumb_url: project.imageUrl, image_url: project.imageUrl },
-        ];
-        for (let i = 1; i < numImages; i++) {
-          const imgUrl = additionalImageUrls[(index + i) % additionalImageUrls.length];
-          projectImages.push({
-            image_id: `img_${project.id}_0${i + 1}`,
-            thumb_url: imgUrl,
-            image_url: imgUrl,
+        // Decide which API to call based on input type
+        if (searchImage && searchImage instanceof File) {
+          // Image search
+          const response = await searchByImageFile(searchImage, {
+            topK: 50,
+            wVisual: searchEmphasis === 'visual' ? 1.0 : 0.5,
+            wAttr: searchEmphasis === 'semantic' ? 0.5 : 0.25,
           });
+          apiResults = response.results || [];
+        } else if (searchQuery.trim()) {
+          // Text search
+          const response = await searchByText(searchQuery, { topK: 50 });
+          apiResults = response.results || [];
         }
 
-        return {
+        // Transform API results to SearchResultData format
+        const transformedResults: SearchResultData[] = apiResults.map((result, index) => {
+          const score = result.score ?? (1 - (result.distance ?? 0.5));
+          const thumbUrl = toAbsoluteUrl(result.thumb_url) || '';
+
+          const projectImages: ProjectImage[] = [
+            {
+              image_id: result.image_id || `img_${result.project_id}_01`,
+              thumb_url: thumbUrl,
+              image_url: thumbUrl,
+            },
+          ];
+
+          return {
+            project_id: result.project_id || `project-${index}`,
+            project_title: result.title || result.project_id || 'Unknown Project',
+            architect: result.architect || 'Unknown Architect',
+            location_display: result.country || 'Unknown Location',
+            year: result.year || 2024,
+            image_id: result.image_id || `img_${result.project_id}_01`,
+            thumb_url: thumbUrl,
+            image_url: thumbUrl,
+            images: projectImages,
+            score: score,
+            match_reason:
+              searchEmphasis === 'visual'
+                ? 'Visual similarity'
+                : searchEmphasis === 'semantic'
+                ? 'Semantic match'
+                : 'Balanced match',
+            badges: {
+              typology: result.typology ? [result.typology] : [],
+              country: result.country ? [result.country] : [],
+              climate_bin: result.climate_bin ? [result.climate_bin] : [],
+            },
+          };
+        });
+
+        setResults(transformedResults);
+      } catch (error) {
+        console.error('Search failed:', error);
+        toast.error('Search failed. Using fallback results.');
+
+        // Fallback to mock data
+        const fallbackResults: SearchResultData[] = mockProjects.slice(0, 12).map((project, index) => ({
           project_id: project.id,
           project_title: project.name,
           architect: project.architect,
@@ -140,24 +172,19 @@ export function ClassicSearchPage() {
           image_id: `img_${project.id}_01`,
           thumb_url: project.imageUrl,
           image_url: project.imageUrl,
-          images: projectImages,
-          score: finalScore,
-          match_reason:
-            searchEmphasis === 'visual'
-              ? 'Visual similarity'
-              : searchEmphasis === 'semantic'
-              ? 'Semantic match'
-              : 'Balanced match',
+          images: [{ image_id: `img_${project.id}_01`, thumb_url: project.imageUrl, image_url: project.imageUrl }],
+          score: 0.95 - index * 0.015,
+          match_reason: 'Fallback result',
           badges: {
             typology: [project.buildingType],
             country: [project.location.split(',').pop()?.trim() || ''],
             climate_bin: project.climate,
           },
-        };
-      });
-
-      setResults(mockResults);
-      setIsSearching(false);
+        }));
+        setResults(fallbackResults);
+      } finally {
+        setIsSearching(false);
+      }
     },
     []
   );

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useLocation } from "wouter";
 import { mockProjects } from "../lib/mockData";
 import { useSearchStore, SearchResult } from "../stores/searchStore";
+import { searchByText, toAbsoluteUrl } from "../lib/navigatorApi";
 import { useCanvasStore } from "../stores/canvasStore";
 import { NodeCanvas } from "../components/Canvas/NodeCanvas";
 import { NodePaletteSidebar } from "../components/Sidebar/NodePaletteSidebar";
@@ -56,34 +57,62 @@ export function ResultsPage() {
   const { searchResults, setSearchResults, setSearchQuery: setStoreQuery } = useSearchStore();
   const { nodes, addNodes, executeWorkflow } = useCanvasStore();
 
-  // Initialize search results from mock data with multi-modal scores (only if hasSearched)
+  // Initialize search results when page loads with a query parameter
   useEffect(() => {
-    if (hasSearched && (searchResults.length === 0 || currentSearchQuery)) {
-      const resultsWithMatch: SearchResult[] = mockProjects.slice(0, 50).map((project, index) => {
-        const baseScore = 0.7 + (Math.random() * 0.25);
-        const visualScore = baseScore + (Math.random() * 0.1 - 0.05);
-        const spatialScore = baseScore + (Math.random() * 0.1 - 0.05);
-        const attributeScore = baseScore + (Math.random() * 0.1 - 0.05);
-        
-        return {
-        ...project,
-          matchPercentage: 95 - (index * 1.5),
-          similarityScore: (95 - index * 1.5) / 100,
-          visualScore: Math.max(0.3, Math.min(1.0, visualScore)),
-          spatialScore: Math.max(0.3, Math.min(1.0, spatialScore)),
-          attributeScore: Math.max(0.3, Math.min(1.0, attributeScore)),
-        url: project.imageUrl,
-        typology: project.buildingType,
-        materials: project.style,
-          climate: Array.isArray(project.climate) ? project.climate : (project.climate ? [project.climate] : []),
-        };
-      });
-      setSearchResults(resultsWithMatch);
-      if (currentSearchQuery) {
-        setStoreQuery(currentSearchQuery);
+    const performInitialSearch = async () => {
+      if (hasSearched && searchResults.length === 0 && currentSearchQuery) {
+        setIsSearching(true);
+        try {
+          const response = await searchByText(currentSearchQuery, { topK: 50 });
+          
+          const resultsWithMatch: SearchResult[] = response.results.map((result, index) => {
+            const score = result.score ?? 0.5;
+            const matchPercentage = Math.round(score * 100);
+            
+            return {
+              id: result.project_id || result.image_id || `result-${index}`,
+              title: result.title || result.project_id || 'Unknown Project',
+              imageUrl: toAbsoluteUrl(result.thumb_url) || '',
+              buildingType: result.typology || 'Unknown',
+              style: result.massing_type || 'Unknown',
+              location: result.country || 'Unknown',
+              year: 2024,
+              description: `Project in ${result.country || 'unknown location'}`,
+              matchPercentage,
+              similarityScore: score,
+              visualScore: score,
+              spatialScore: score * 0.9,
+              attributeScore: score * 0.85,
+              url: toAbsoluteUrl(result.thumb_url) || '',
+              typology: result.typology || 'Unknown',
+              materials: result.massing_type || 'Unknown',
+              climate: result.climate_bin ? [result.climate_bin] : [],
+            };
+          });
+          
+          setSearchResults(resultsWithMatch);
+          setStoreQuery(currentSearchQuery);
+        } catch (error) {
+          console.error('Initial search failed:', error);
+          // Fallback to mock data
+          const fallbackResults: SearchResult[] = mockProjects.slice(0, 12).map((project, index) => ({
+            ...project,
+            matchPercentage: 95 - (index * 1.5),
+            similarityScore: (95 - index * 1.5) / 100,
+            visualScore: 0.7,
+            spatialScore: 0.7,
+            attributeScore: 0.7,
+          }));
+          setSearchResults(fallbackResults);
+          setStoreQuery(currentSearchQuery);
+        } finally {
+          setIsSearching(false);
+        }
       }
-    }
-  }, [hasSearched, searchResults.length, setSearchResults, currentSearchQuery, setStoreQuery]);
+    };
+    
+    performInitialSearch();
+  }, [hasSearched, searchResults.length, currentSearchQuery]);
 
   // Track if we've already handled the image param
   const imageParamHandledRef = useRef(false);
@@ -436,33 +465,62 @@ export function ResultsPage() {
             onChange={(e) => {
               setCurrentSearchQuery(e.target.value);
             }}
-            onKeyDown={(e) => {
+            onKeyDown={async (e) => {
               if (e.key === 'Enter' && currentSearchQuery.trim() && !isSearching) {
                 setIsSearching(true);
                 setHasSearched(true);
                 
-                // Artificial 2-second delay for search
-                setTimeout(() => {
-                  // Trigger search
-                  const resultsWithMatch: SearchResult[] = mockProjects.slice(0, 50).map((project, index) => {
-                    const baseScore = 0.7 + (Math.random() * 0.25);
-                    const visualScore = baseScore + (Math.random() * 0.1 - 0.05);
-                    const spatialScore = baseScore + (Math.random() * 0.1 - 0.05);
-                    const attributeScore = baseScore + (Math.random() * 0.1 - 0.05);
+                try {
+                  // Call real API for text search
+                  const response = await searchByText(currentSearchQuery, {
+                    topK: 50,
+                  });
+                  
+                  // Transform API results to SearchResult format
+                  const resultsWithMatch: SearchResult[] = response.results.map((result, index) => {
+                    // Convert API score to display scores
+                    const score = result.score ?? 0.5;
+                    const matchPercentage = Math.round(score * 100);
                     
                     return {
-                      ...project,
-                      matchPercentage: 95 - (index * 1.5),
-                      similarityScore: (95 - index * 1.5) / 100,
-                      visualScore: Math.max(0.3, Math.min(1.0, visualScore)),
-                      spatialScore: Math.max(0.3, Math.min(1.0, spatialScore)),
-                      attributeScore: Math.max(0.3, Math.min(1.0, attributeScore)),
+                      id: result.project_id || result.image_id || `result-${index}`,
+                      title: result.title || result.project_id || 'Unknown Project',
+                      imageUrl: toAbsoluteUrl(result.thumb_url) || '',
+                      buildingType: result.typology || 'Unknown',
+                      style: result.massing_type || 'Unknown',
+                      location: result.country || 'Unknown',
+                      year: 2024,
+                      description: `Project in ${result.country || 'unknown location'}`,
+                      matchPercentage,
+                      similarityScore: score,
+                      visualScore: score,
+                      spatialScore: score * 0.9,
+                      attributeScore: score * 0.85,
+                      url: toAbsoluteUrl(result.thumb_url) || '',
+                      typology: result.typology || 'Unknown',
+                      materials: result.massing_type || 'Unknown',
+                      climate: result.climate_bin ? [result.climate_bin] : [],
                     };
                   });
+                  
                   setSearchResults(resultsWithMatch);
                   setStoreQuery(currentSearchQuery);
+                } catch (error) {
+                  console.error('Text search failed:', error);
+                  // Fallback to mock data on error
+                  const fallbackResults: SearchResult[] = mockProjects.slice(0, 12).map((project, index) => ({
+                    ...project,
+                    matchPercentage: 95 - (index * 1.5),
+                    similarityScore: (95 - index * 1.5) / 100,
+                    visualScore: 0.7,
+                    spatialScore: 0.7,
+                    attributeScore: 0.7,
+                  }));
+                  setSearchResults(fallbackResults);
+                  setStoreQuery(currentSearchQuery);
+                } finally {
                   setIsSearching(false);
-                }, 2000);
+                }
               }
             }}
             style={{
