@@ -4,6 +4,7 @@ from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional, Any
 import os, time, json
+import re
 from datetime import datetime, timezone
 import threading
 import numpy as np
@@ -767,6 +768,102 @@ def search_url(
         "results": lensed_results,
         "debug": debug
     }
+
+
+@app.get("/search/text")
+def search_text(
+    q: str = Query(..., description="Free-text query (keyword-based MVP search over metadata)"),
+    top_k: int = 25,
+    country: Optional[str] = None,
+    typology: Optional[str] = None,
+    climate_bin: Optional[str] = None,
+    _: bool = Depends(require_token),
+):
+    """
+    MVP text search endpoint.
+
+    This does *not* embed text. It ranks projects by simple token overlap against
+    metadata fields (title/country/typology/climate/tags) and returns the best matches.
+    """
+    st = get_store()
+    df = getattr(st, "_projects", None)
+    if df is None or getattr(df, "empty", True):
+        return {"query": q, "results": [], "debug": {"reason": "projects_csv_empty"}}
+
+    query = (q or "").strip()
+    if not query:
+        return {"query": q, "results": [], "debug": {"reason": "empty_query"}}
+
+    # Normalize
+    tokens = [t for t in re.split(r"[^a-zA-Z0-9]+", query.lower()) if t]
+    if not tokens:
+        return {"query": q, "results": [], "debug": {"reason": "no_tokens"}}
+
+    # Apply optional filters first (cheap narrowing)
+    work = df.fillna("")
+    if country:
+        work = work[work["country"].astype(str).str.contains(country, case=False, na=False)]
+    if typology:
+        work = work[work["typology"].astype(str).str.contains(typology, case=False, na=False)]
+    if climate_bin:
+        work = work[work["climate_bin"].astype(str).str.contains(climate_bin, case=False, na=False)]
+
+    if work.empty:
+        return {"query": q, "results": [], "debug": {"reason": "filtered_empty"}}
+
+    # Build a lightweight "haystack" for matching
+    hay = (
+        work["title"].astype(str)
+        + " "
+        + work["country"].astype(str)
+        + " "
+        + work["typology"].astype(str)
+        + " "
+        + work["climate_bin"].astype(str)
+        + " "
+        + work.get("tags", "").astype(str)
+    ).str.lower()
+
+    # Score: token overlap + phrase boost
+    phrase = query.lower()
+    scores = []
+    for idx, text in zip(work.index.tolist(), hay.tolist()):
+        s = 0.0
+        for t in tokens:
+            if t in text:
+                s += 1.0
+        if phrase and phrase in text:
+            s += 2.5
+        scores.append((s, idx))
+
+    scores.sort(key=lambda x: x[0], reverse=True)
+    scores = [x for x in scores if x[0] > 0][: max(1, top_k)]
+
+    results = []
+    for rank, (score, idx) in enumerate(scores, start=1):
+        row = work.loc[idx].to_dict()
+        pid = str(row.get("project_id") or "").strip()
+        thumb = None
+        try:
+            thumb = st.thumb_for_project(pid)
+        except Exception:
+            thumb = None
+
+        results.append(
+            {
+                "rank": rank,
+                "score": float(score),
+                "project_id": pid or None,
+                "title": row.get("title") or None,
+                "country": row.get("country") or None,
+                "typology": row.get("typology") or None,
+                "climate_bin": row.get("climate_bin") or None,
+                "massing_type": row.get("massing_type") or None,
+                "thumb_url": thumb,
+            }
+        )
+
+    return {"query": q, "results": results, "debug": {"tokens": tokens, "candidates": int(len(work))}}
 @app.post("/search/file")
 async def search_file(
     file: UploadFile = File(...),

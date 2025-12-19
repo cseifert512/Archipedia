@@ -57,62 +57,68 @@ export function ResultsPage() {
   const { searchResults, setSearchResults, setSearchQuery: setStoreQuery } = useSearchStore();
   const { nodes, addNodes, executeWorkflow } = useCanvasStore();
 
-  // Initialize search results when page loads with a query parameter
+  const performTextSearch = useCallback(async (query: string) => {
+    const q = query.trim();
+    if (!q) return;
+
+    setIsSearching(true);
+    setHasSearched(true);
+    try {
+      const resp = await searchByText(q, { topK: 50 });
+      const mapped: SearchResult[] = (resp.results || []).map((r: any, idx: number) => {
+        const baseScore = 0.65 + Math.random() * 0.25;
+        const imageUrl = toAbsoluteUrl(r.thumb_url) || undefined;
+        return {
+          id: String(r.project_id || `text_${idx}`),
+          name: String(r.title || r.project_id || 'Result'),
+          imageUrl,
+          url: imageUrl,
+          buildingType: r.typology || undefined,
+          climate: r.climate_bin ? [String(r.climate_bin)] : [],
+          matchPercentage: Math.max(10, 100 - idx),
+          similarityScore: Math.max(0.1, 1 - idx / 100),
+          visualScore: Math.max(0.3, Math.min(1.0, baseScore)),
+          spatialScore: Math.max(0.3, Math.min(1.0, baseScore)),
+          attributeScore: Math.max(0.3, Math.min(1.0, baseScore)),
+          typology: r.typology ? String(r.typology) : undefined,
+        } as any;
+      });
+      setSearchResults(mapped);
+      setStoreQuery(q);
+    } catch (error) {
+      console.error('Text search failed, falling back to mock results:', error);
+      const resultsWithMatch: SearchResult[] = mockProjects.slice(0, 50).map((project, index) => {
+        const baseScore = 0.7 + (Math.random() * 0.25);
+        const visualScore = baseScore + (Math.random() * 0.1 - 0.05);
+        const spatialScore = baseScore + (Math.random() * 0.1 - 0.05);
+        const attributeScore = baseScore + (Math.random() * 0.1 - 0.05);
+        
+        return {
+          ...project,
+          matchPercentage: 95 - (index * 1.5),
+          similarityScore: (95 - index * 1.5) / 100,
+          visualScore: Math.max(0.3, Math.min(1.0, visualScore)),
+          spatialScore: Math.max(0.3, Math.min(1.0, spatialScore)),
+          attributeScore: Math.max(0.3, Math.min(1.0, attributeScore)),
+          url: project.imageUrl,
+          typology: project.buildingType,
+          materials: project.style,
+          climate: Array.isArray(project.climate) ? project.climate : (project.climate ? [project.climate] : []),
+        };
+      });
+      setSearchResults(resultsWithMatch);
+      setStoreQuery(q);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [setIsSearching, setHasSearched, setSearchResults, setStoreQuery]);
+
+  // If URL provides a query (e.g. /results?q=...), run a text search on load.
   useEffect(() => {
-    const performInitialSearch = async () => {
-      if (hasSearched && searchResults.length === 0 && currentSearchQuery) {
-        setIsSearching(true);
-        try {
-          const response = await searchByText(currentSearchQuery, { topK: 50 });
-          
-          const resultsWithMatch: SearchResult[] = response.results.map((result, index) => {
-            const score = result.score ?? 0.5;
-            const matchPercentage = Math.round(score * 100);
-            
-            return {
-              id: result.project_id || result.image_id || `result-${index}`,
-              title: result.title || result.project_id || 'Unknown Project',
-              imageUrl: toAbsoluteUrl(result.thumb_url) || '',
-              buildingType: result.typology || 'Unknown',
-              style: result.massing_type || 'Unknown',
-              location: result.country || 'Unknown',
-              year: 2024,
-              description: `Project in ${result.country || 'unknown location'}`,
-              matchPercentage,
-              similarityScore: score,
-              visualScore: score,
-              spatialScore: score * 0.9,
-              attributeScore: score * 0.85,
-              url: toAbsoluteUrl(result.thumb_url) || '',
-              typology: result.typology || 'Unknown',
-              materials: result.massing_type || 'Unknown',
-              climate: result.climate_bin ? [result.climate_bin] : [],
-            };
-          });
-          
-          setSearchResults(resultsWithMatch);
-          setStoreQuery(currentSearchQuery);
-        } catch (error) {
-          console.error('Initial search failed:', error);
-          // Fallback to mock data
-          const fallbackResults: SearchResult[] = mockProjects.slice(0, 12).map((project, index) => ({
-            ...project,
-            matchPercentage: 95 - (index * 1.5),
-            similarityScore: (95 - index * 1.5) / 100,
-            visualScore: 0.7,
-            spatialScore: 0.7,
-            attributeScore: 0.7,
-          }));
-          setSearchResults(fallbackResults);
-          setStoreQuery(currentSearchQuery);
-        } finally {
-          setIsSearching(false);
-        }
-      }
-    };
-    
-    performInitialSearch();
-  }, [hasSearched, searchResults.length, currentSearchQuery]);
+    if (!initialSearchQuery.trim()) return;
+    if (searchResults.length > 0) return;
+    performTextSearch(initialSearchQuery);
+  }, [initialSearchQuery, searchResults.length, performTextSearch]);
 
   // Track if we've already handled the image param
   const imageParamHandledRef = useRef(false);
@@ -465,62 +471,9 @@ export function ResultsPage() {
             onChange={(e) => {
               setCurrentSearchQuery(e.target.value);
             }}
-            onKeyDown={async (e) => {
+            onKeyDown={(e) => {
               if (e.key === 'Enter' && currentSearchQuery.trim() && !isSearching) {
-                setIsSearching(true);
-                setHasSearched(true);
-                
-                try {
-                  // Call real API for text search
-                  const response = await searchByText(currentSearchQuery, {
-                    topK: 50,
-                  });
-                  
-                  // Transform API results to SearchResult format
-                  const resultsWithMatch: SearchResult[] = response.results.map((result, index) => {
-                    // Convert API score to display scores
-                    const score = result.score ?? 0.5;
-                    const matchPercentage = Math.round(score * 100);
-                    
-                    return {
-                      id: result.project_id || result.image_id || `result-${index}`,
-                      title: result.title || result.project_id || 'Unknown Project',
-                      imageUrl: toAbsoluteUrl(result.thumb_url) || '',
-                      buildingType: result.typology || 'Unknown',
-                      style: result.massing_type || 'Unknown',
-                      location: result.country || 'Unknown',
-                      year: 2024,
-                      description: `Project in ${result.country || 'unknown location'}`,
-                      matchPercentage,
-                      similarityScore: score,
-                      visualScore: score,
-                      spatialScore: score * 0.9,
-                      attributeScore: score * 0.85,
-                      url: toAbsoluteUrl(result.thumb_url) || '',
-                      typology: result.typology || 'Unknown',
-                      materials: result.massing_type || 'Unknown',
-                      climate: result.climate_bin ? [result.climate_bin] : [],
-                    };
-                  });
-                  
-                  setSearchResults(resultsWithMatch);
-                  setStoreQuery(currentSearchQuery);
-                } catch (error) {
-                  console.error('Text search failed:', error);
-                  // Fallback to mock data on error
-                  const fallbackResults: SearchResult[] = mockProjects.slice(0, 12).map((project, index) => ({
-                    ...project,
-                    matchPercentage: 95 - (index * 1.5),
-                    similarityScore: (95 - index * 1.5) / 100,
-                    visualScore: 0.7,
-                    spatialScore: 0.7,
-                    attributeScore: 0.7,
-                  }));
-                  setSearchResults(fallbackResults);
-                  setStoreQuery(currentSearchQuery);
-                } finally {
-                  setIsSearching(false);
-                }
+                performTextSearch(currentSearchQuery);
               }
             }}
             style={{

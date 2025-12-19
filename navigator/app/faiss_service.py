@@ -19,6 +19,7 @@ class FaissStore:
         self._lock = threading.RLock()
         self._index = None
         self._idmap: Dict[str, Dict[str, str]] = {}
+        self._thumb_by_project: Dict[str, str] = {}
         self._projects = None
         self._spatial_features: Dict[str, List[float]] = {}
         self._spatial_normalizers: Dict[str, Tuple[float, float]] = {}
@@ -128,6 +129,19 @@ class FaissStore:
             # Load id_map
             with open(self.idmap_path, "r", encoding="utf-8") as f:
                 self._idmap = json.load(f)
+            # Build a quick project_id -> thumb lookup for text search and hydration fallbacks
+            self._thumb_by_project = {}
+            try:
+                for _, meta in self._idmap.items():
+                    if not isinstance(meta, dict):
+                        continue
+                    pid = meta.get("project_id")
+                    thumb = meta.get("thumb")
+                    if pid and thumb and pid not in self._thumb_by_project:
+                        self._thumb_by_project[pid] = thumb
+            except Exception:
+                # Never fail reload due to lookup-building
+                self._thumb_by_project = {}
             # Load projects.csv for hydration
             if os.path.exists(self.meta_csv):
                 self._projects = pd.read_csv(self.meta_csv)
@@ -194,18 +208,29 @@ class FaissStore:
             if not pid or str(pid).strip() in {"null", "None"}:
                 continue
 
-            # Require a thumbnail path and that the file exists on disk
-            if not thumb_url:
-                continue
-            thumb_path = os.path.join(self.data_dir, thumb_url.lstrip("/"))
-            if not os.path.isfile(thumb_path):
-                continue
+            # Thumbnail handling:
+            # In production (Render), we may not ship the full image corpus. If we hard-drop results
+            # when thumbnails are missing, *every* query looks empty. Instead, return the hit and
+            # let the frontend render a placeholder when thumb_url is absent/unavailable.
+            thumb_missing = False
+            if thumb_url:
+                thumb_path = os.path.join(self.data_dir, thumb_url.lstrip("/"))
+                if not os.path.isfile(thumb_path):
+                    thumb_missing = True
+                    thumb_url = None
 
             out.append({
                 "rank": rank,
                 "distance": float(dist),
                 "faiss_id": int(idx),
+                "thumb_missing": thumb_missing,
                 **meta,
             })
 
         return out
+
+    def thumb_for_project(self, project_id: str) -> Optional[str]:
+        """Best-effort thumbnail path for a project_id (may be missing on disk)."""
+        if not project_id:
+            return None
+        return self._thumb_by_project.get(project_id)

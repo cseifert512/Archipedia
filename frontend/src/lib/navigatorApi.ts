@@ -25,6 +25,25 @@ export interface NavigatorSearchFileResponse {
   debug?: Record<string, any>;
 }
 
+export interface NavigatorTextSearchResult {
+  rank?: number;
+  score?: number;
+  project_id?: string;
+  title?: string;
+  country?: string;
+  typology?: string;
+  climate_bin?: string;
+  massing_type?: string;
+  thumb_url?: string | null;
+  [key: string]: any;
+}
+
+export interface NavigatorSearchTextResponse {
+  query?: string;
+  results: NavigatorTextSearchResult[];
+  debug?: Record<string, any>;
+}
+
 function getApiBaseUrl(): string {
   const raw = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
   return (raw && raw.trim()) ? raw.trim().replace(/\/+$/, "") : "http://localhost:8000";
@@ -87,58 +106,27 @@ export async function searchByImageFile(
   return (await res.json()) as NavigatorSearchFileResponse;
 }
 
-export interface TextSearchOptions {
-  topK?: number;
-  typology?: string;
-  climateBin?: string;
-  massingType?: string;
-  strict?: boolean;
-}
-
-export interface TextSearchResponse {
-  query_id?: string;
-  embed_latency_ms?: number;
-  latency_ms?: number;
-  query?: string;
-  filters?: Record<string, any>;
-  results: NavigatorSearchResult[];
-  debug?: Record<string, any>;
-}
-
-/**
- * Search by natural language text query using semantic embeddings.
- */
 export async function searchByText(
   query: string,
-  options?: TextSearchOptions
-): Promise<TextSearchResponse> {
+  options?: { topK?: number; country?: string; typology?: string; climateBin?: string }
+): Promise<NavigatorSearchTextResponse> {
   const base = getApiBaseUrl();
-  const topK = options?.topK ?? 12;
+  const q = (query || "").trim();
+  const topK = options?.topK ?? 25;
 
-  const body: Record<string, any> = {
-    query,
-    top_k: topK,
-    filters: {},
-    strict: options?.strict ?? false,
-  };
+  const params = new URLSearchParams();
+  params.set("q", q);
+  params.set("top_k", String(topK));
+  if (options?.country) params.set("country", options.country);
+  if (options?.typology) params.set("typology", options.typology);
+  if (options?.climateBin) params.set("climate_bin", options.climateBin);
 
-  if (options?.typology) {
-    body.filters.typology = options.typology;
-  }
-  if (options?.climateBin) {
-    body.filters.climate_bin = options.climateBin;
-  }
-  if (options?.massingType) {
-    body.filters.massing_type = options.massingType;
-  }
-
-  const res = await fetch(`${base}/search/text`, {
-    method: "POST",
+  const res = await fetch(`${base}/search/text?${params.toString()}`, {
+    method: "GET",
     headers: {
       "Content-Type": "application/json",
       ...getAuthHeader(),
     },
-    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -146,7 +134,7 @@ export async function searchByText(
     throw new Error(`Navigator /search/text failed (${res.status}): ${text || res.statusText}`);
   }
 
-  return (await res.json()) as TextSearchResponse;
+  return (await res.json()) as NavigatorSearchTextResponse;
 }
 
 
