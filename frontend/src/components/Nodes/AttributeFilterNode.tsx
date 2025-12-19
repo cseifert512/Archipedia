@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { AttributeFilterNodeData } from '../../types/nodes';
-import { Filter, X } from 'lucide-react';
+import { Filter, X, Play } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 
 interface AttributeFilterNodeProps {
@@ -15,7 +15,14 @@ export const AttributeFilterNode: React.FC<AttributeFilterNodeProps> = ({
   selected,
   id,
 }) => {
-  const { deleteNode } = useCanvasStore();
+  const { deleteNode, executeFromNode } = useCanvasStore();
+
+  const handleRun = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (id) {
+      await executeFromNode(id);
+    }
+  };
   const [weights, setWeights] = useState(data.weights || { visual: 40, spatial: 10, regional: 50 });
   const [keywords, setKeywords] = useState(data.keywords || '');
   const [inputCount, setInputCount] = useState(12);
@@ -137,35 +144,65 @@ export const AttributeFilterNode: React.FC<AttributeFilterNodeProps> = ({
             Attributes - Fusion Weights
           </span>
         </div>
-        <button
-          onClick={handleDelete}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{
-            position: 'absolute',
-            top: '8px',
-            right: '8px',
-            background: 'rgba(0,0,0,0.05)',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            padding: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: 0.7,
-            transition: 'opacity 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '1';
-            e.currentTarget.style.background = 'rgba(255,0,0,0.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '0.7';
-            e.currentTarget.style.background = 'rgba(0,0,0,0.05)';
-          }}
-        >
-          <X size={14} color="#000000" />
-        </button>
+        <div style={{ display: 'flex', gap: '4px', position: 'absolute', top: '8px', right: '8px' }}>
+          <button
+            onClick={handleRun}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(0,0,0,0.05)',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              opacity: 0.7,
+              transition: 'opacity 0.2s',
+              fontFamily: 'var(--font-primary)',
+              fontSize: '9px',
+              color: '#000000',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.background = 'rgba(0,0,0,0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.7';
+              e.currentTarget.style.background = 'rgba(0,0,0,0.05)';
+            }}
+          >
+            <Play size={10} />
+            RUN
+          </button>
+          <button
+            onClick={handleDelete}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(0,0,0,0.05)',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: 0.7,
+              transition: 'opacity 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.background = 'rgba(255,0,0,0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.7';
+              e.currentTarget.style.background = 'rgba(0,0,0,0.05)';
+            }}
+          >
+            <X size={14} color="#000000" />
+          </button>
+        </div>
       </div>
 
       <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>

@@ -309,7 +309,7 @@ export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id
                 zIndex: 1,
               }}
             >
-              {currentProject.thumbnail ? (
+              {currentProject.thumbnail && currentProject.thumbnail.trim() ? (
                 <img
                   src={currentProject.thumbnail}
                   alt={currentProject.title}
@@ -318,21 +318,55 @@ export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id
                     height: '100%',
                     objectFit: 'cover',
                   }}
+                  onError={(e) => {
+                    // Hide broken image and show fallback
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
                 />
-              ) : (
+              ) : null}
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#FFC800',
+                  display: currentProject.thumbnail && currentProject.thumbnail.trim() ? 'none' : 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                }}
+              >
                 <div
                   style={{
-                    width: '100%',
-                    height: '100%',
-                    backgroundColor: '#FFC800',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    fontSize: '24px',
+                    fontWeight: 600,
+                    color: '#1a1a1a',
+                    fontFamily: 'var(--font-primary)',
                   }}
                 >
-                  <ImageIcon size={32} color="#1a1a1a" />
+                  {(currentProject.title || 'P').charAt(0).toUpperCase()}
                 </div>
-              )}
+                <div
+                  style={{
+                    fontSize: '10px',
+                    color: 'rgba(26,26,26,0.7)',
+                    fontFamily: 'var(--font-primary)',
+                    textAlign: 'center',
+                    padding: '0 8px',
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {currentProject.title || 'Project'}
+                </div>
+              </div>
               {/* Carousel Navigation Arrows - Only show when stacked */}
               {isStacked && (
                 <>

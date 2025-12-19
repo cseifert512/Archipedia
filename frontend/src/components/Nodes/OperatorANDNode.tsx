@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { OperatorANDNodeData } from '../../types/nodes';
-import { Circle, Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Circle, Plus, X, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 
 interface OperatorANDNodeProps {
@@ -15,7 +15,14 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
   selected,
   id,
 }) => {
-  const { deleteNode } = useCanvasStore();
+  const { deleteNode, executeFromNode } = useCanvasStore();
+
+  const handleRun = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (id) {
+      await executeFromNode(id);
+    }
+  };
   const [isExpanded, setIsExpanded] = useState(false);
   const [inputs, setInputs] = useState(data.inputData || [
     { nodeId: 'input-a', weight: 60, results: [] },
@@ -157,6 +164,37 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
           </span>
         </div>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <button
+            onClick={handleRun}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(0,0,0,0.05)',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer',
+              padding: '2px 6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '2px',
+              opacity: 0.7,
+              transition: 'opacity 0.2s',
+              fontFamily: 'var(--font-primary)',
+              fontSize: '8px',
+              color: '#000000',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.background = 'rgba(0,0,0,0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.7';
+              e.currentTarget.style.background = 'rgba(0,0,0,0.05)';
+            }}
+          >
+            <Play size={8} />
+            RUN
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
