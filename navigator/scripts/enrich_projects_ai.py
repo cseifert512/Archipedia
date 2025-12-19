@@ -436,6 +436,14 @@ class ProjectEnricher:
             # Update with enriched data
             for key, value in enriched_data.items():
                 if hasattr(project, key):
+                    # Capitalize list fields for professional presentation
+                    if isinstance(value, list) and key in [
+                        "tags", "notable_features", "sustainability_features", 
+                        "passive_strategies", "certifications", "awards",
+                        "exterior_characteristics", "interior_characteristics",
+                        "interior_materials"
+                    ]:
+                        value = [item.title() if isinstance(item, str) else item for item in value]
                     setattr(project, key, value)
             
             # Merge vision data
@@ -594,12 +602,12 @@ async def main():
                 print(f"Failed to process project {i}: {e}")
                 continue
     
-    print(f"\n✓ Enriched {enriched_count} projects")
-    print(f"✓ Output saved to: {output_path}")
+    print(f"\n[OK] Enriched {enriched_count} projects")
+    print(f"[OK] Output saved to: {output_path}")
     
     # Also create a summary CSV for quick viewing
     summary_csv = output_path.with_suffix('.csv')
-    print(f"✓ Creating summary CSV: {summary_csv}")
+    print(f"[OK] Creating summary CSV: {summary_csv}")
     
     # Read JSONL and write CSV summary
     with open(output_path, 'r', encoding='utf-8') as f:
@@ -618,7 +626,7 @@ async def main():
             for project in enriched_projects:
                 writer.writerow({k: project.get(k, '') for k in csv_fields})
         
-        print(f"✓ Summary CSV saved")
+        print(f"[OK] Summary CSV saved")
 
 
 if __name__ == "__main__":
