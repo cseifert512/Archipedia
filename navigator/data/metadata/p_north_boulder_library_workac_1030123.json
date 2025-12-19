@@ -1,0 +1,24 @@
+{
+  "projectId": "p_north_boulder_library_workac_1030123",
+  "projectTitle": "North Boulder Library / WORKac",
+  "projectUrl": "https://www.archdaily.com/1030123/north-boulder-library-workac",
+  "exteriorCount": 5,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:43:50.572Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_north_boulder_library_workac_1030123_exterior1.jpg",
+      "p_north_boulder_library_workac_1030123_exterior2.jpg",
+      "p_north_boulder_library_workac_1030123_exterior3.jpg",
+      "p_north_boulder_library_workac_1030123_exterior4.jpg",
+      "p_north_boulder_library_workac_1030123_exterior5.jpg"
+    ],
+    "interiors": [
+      "p_north_boulder_library_workac_1030123_interior1.jpg",
+      "p_north_boulder_library_workac_1030123_interior2.jpg",
+      "p_north_boulder_library_workac_1030123_interior3.jpg",
+      "p_north_boulder_library_workac_1030123_interior4.jpg",
+      "p_north_boulder_library_workac_1030123_interior5.jpg"
+    ]
+  }
+}

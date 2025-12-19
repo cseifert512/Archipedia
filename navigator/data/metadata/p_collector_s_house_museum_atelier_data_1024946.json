@@ -1,0 +1,23 @@
+{
+  "projectId": "p_collector_s_house_museum_atelier_data_1024946",
+  "projectTitle": "Collector's House Museum / Atelier Data",
+  "projectUrl": "https://www.archdaily.com/1024946/collectors-house-museum-atelier-data",
+  "exteriorCount": 4,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:45:13.544Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_collector_s_house_museum_atelier_data_1024946_exterior1.jpg",
+      "p_collector_s_house_museum_atelier_data_1024946_exterior2.jpg",
+      "p_collector_s_house_museum_atelier_data_1024946_exterior3.jpg",
+      "p_collector_s_house_museum_atelier_data_1024946_exterior4.jpg"
+    ],
+    "interiors": [
+      "p_collector_s_house_museum_atelier_data_1024946_interior1.jpg",
+      "p_collector_s_house_museum_atelier_data_1024946_interior2.jpg",
+      "p_collector_s_house_museum_atelier_data_1024946_interior3.jpg",
+      "p_collector_s_house_museum_atelier_data_1024946_interior4.jpg",
+      "p_collector_s_house_museum_atelier_data_1024946_interior5.jpg"
+    ]
+  }
+}

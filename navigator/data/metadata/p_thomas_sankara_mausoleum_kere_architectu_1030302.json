@@ -1,0 +1,23 @@
+{
+  "projectId": "p_thomas_sankara_mausoleum_kere_architectu_1030302",
+  "projectTitle": "Thomas Sankara Mausoleum / Kere Architecture",
+  "projectUrl": "https://www.archdaily.com/1030302/thomas-sankara-mausoleum-kere-architecture",
+  "exteriorCount": 4,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:42:53.969Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_thomas_sankara_mausoleum_kere_architectu_1030302_exterior1.jpg",
+      "p_thomas_sankara_mausoleum_kere_architectu_1030302_exterior2.jpg",
+      "p_thomas_sankara_mausoleum_kere_architectu_1030302_exterior3.jpg",
+      "p_thomas_sankara_mausoleum_kere_architectu_1030302_exterior4.jpg"
+    ],
+    "interiors": [
+      "p_thomas_sankara_mausoleum_kere_architectu_1030302_interior1.jpg",
+      "p_thomas_sankara_mausoleum_kere_architectu_1030302_interior2.jpg",
+      "p_thomas_sankara_mausoleum_kere_architectu_1030302_interior3.jpg",
+      "p_thomas_sankara_mausoleum_kere_architectu_1030302_interior4.jpg",
+      "p_thomas_sankara_mausoleum_kere_architectu_1030302_interior5.jpg"
+    ]
+  }
+}

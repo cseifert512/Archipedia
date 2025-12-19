@@ -1,0 +1,24 @@
+{
+  "projectId": "p_fenix_art_museum_mad_architects_1030328",
+  "projectTitle": "Fenix Art Museum / MAD Architects",
+  "projectUrl": "https://www.archdaily.com/1030328/fenix-art-museum-mad-architects",
+  "exteriorCount": 5,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:43:39.538Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_fenix_art_museum_mad_architects_1030328_exterior1.jpg",
+      "p_fenix_art_museum_mad_architects_1030328_exterior2.jpg",
+      "p_fenix_art_museum_mad_architects_1030328_exterior3.jpg",
+      "p_fenix_art_museum_mad_architects_1030328_exterior4.jpg",
+      "p_fenix_art_museum_mad_architects_1030328_exterior5.jpg"
+    ],
+    "interiors": [
+      "p_fenix_art_museum_mad_architects_1030328_interior1.jpg",
+      "p_fenix_art_museum_mad_architects_1030328_interior2.jpg",
+      "p_fenix_art_museum_mad_architects_1030328_interior3.jpg",
+      "p_fenix_art_museum_mad_architects_1030328_interior4.jpg",
+      "p_fenix_art_museum_mad_architects_1030328_interior5.jpg"
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "projectId": "p_moon_pavilion_atelier_guo_1034543",
+  "projectTitle": "Moon Pavilion / Atelier Guo",
+  "projectUrl": "https://www.archdaily.com/1034543/moon-pavilion-atelier-guo",
+  "exteriorCount": 4,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:42:47.955Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_moon_pavilion_atelier_guo_1034543_exterior1.jpg",
+      "p_moon_pavilion_atelier_guo_1034543_exterior2.jpg",
+      "p_moon_pavilion_atelier_guo_1034543_exterior3.jpg",
+      "p_moon_pavilion_atelier_guo_1034543_exterior4.jpg"
+    ],
+    "interiors": [
+      "p_moon_pavilion_atelier_guo_1034543_interior1.jpg",
+      "p_moon_pavilion_atelier_guo_1034543_interior2.jpg",
+      "p_moon_pavilion_atelier_guo_1034543_interior3.jpg",
+      "p_moon_pavilion_atelier_guo_1034543_interior4.jpg",
+      "p_moon_pavilion_atelier_guo_1034543_interior5.jpg"
+    ]
+  }
+}

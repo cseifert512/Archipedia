@@ -1,0 +1,24 @@
+{
+  "projectId": "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511",
+  "projectTitle": "Tile Chapel / Jimenez Arquitectos + FB+ estudio",
+  "projectUrl": "https://www.archdaily.com/1026511/tile-chapel-jimenez-arquitectos-plus-fb-plus-estudio",
+  "exteriorCount": 5,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:43:20.148Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_exterior1.jpg",
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_exterior2.jpg",
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_exterior3.jpg",
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_exterior4.jpg",
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_exterior5.jpg"
+    ],
+    "interiors": [
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_interior1.jpg",
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_interior2.jpg",
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_interior3.jpg",
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_interior4.jpg",
+      "p_tile_chapel_jimenez_arquitectos_fb_estud_1026511_interior5.jpg"
+    ]
+  }
+}

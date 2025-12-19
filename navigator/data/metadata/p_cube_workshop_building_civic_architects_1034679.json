@@ -1,0 +1,24 @@
+{
+  "projectId": "p_cube_workshop_building_civic_architects_1034679",
+  "projectTitle": "CUBE Workshop Building / Civic Architects",
+  "projectUrl": "https://www.archdaily.com/1034679/cube-workshop-building-civic-architects",
+  "exteriorCount": 5,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:43:37.290Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_cube_workshop_building_civic_architects_1034679_exterior1.jpg",
+      "p_cube_workshop_building_civic_architects_1034679_exterior2.jpg",
+      "p_cube_workshop_building_civic_architects_1034679_exterior3.jpg",
+      "p_cube_workshop_building_civic_architects_1034679_exterior4.jpg",
+      "p_cube_workshop_building_civic_architects_1034679_exterior5.jpg"
+    ],
+    "interiors": [
+      "p_cube_workshop_building_civic_architects_1034679_interior1.jpg",
+      "p_cube_workshop_building_civic_architects_1034679_interior2.jpg",
+      "p_cube_workshop_building_civic_architects_1034679_interior3.jpg",
+      "p_cube_workshop_building_civic_architects_1034679_interior4.jpg",
+      "p_cube_workshop_building_civic_architects_1034679_interior5.jpg"
+    ]
+  }
+}

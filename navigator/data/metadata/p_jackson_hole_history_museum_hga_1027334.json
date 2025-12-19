@@ -1,0 +1,24 @@
+{
+  "projectId": "p_jackson_hole_history_museum_hga_1027334",
+  "projectTitle": "Jackson Hole History Museum / HGA",
+  "projectUrl": "https://www.archdaily.com/1027334/jackson-hole-history-museum-hga",
+  "exteriorCount": 5,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:41:35.562Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_jackson_hole_history_museum_hga_1027334_exterior1.jpg",
+      "p_jackson_hole_history_museum_hga_1027334_exterior2.jpg",
+      "p_jackson_hole_history_museum_hga_1027334_exterior3.jpg",
+      "p_jackson_hole_history_museum_hga_1027334_exterior4.jpg",
+      "p_jackson_hole_history_museum_hga_1027334_exterior5.jpg"
+    ],
+    "interiors": [
+      "p_jackson_hole_history_museum_hga_1027334_interior1.jpg",
+      "p_jackson_hole_history_museum_hga_1027334_interior2.jpg",
+      "p_jackson_hole_history_museum_hga_1027334_interior3.jpg",
+      "p_jackson_hole_history_museum_hga_1027334_interior4.jpg",
+      "p_jackson_hole_history_museum_hga_1027334_interior5.jpg"
+    ]
+  }
+}

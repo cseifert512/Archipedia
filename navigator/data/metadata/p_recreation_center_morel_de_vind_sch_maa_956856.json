@@ -1,0 +1,24 @@
+{
+  "projectId": "p_recreation_center_morel_de_vind_sch_maa_956856",
+  "projectTitle": "Recreation Center Morel de Vindé / SCHÉMAA",
+  "projectUrl": "https://www.archdaily.com/956856/recreation-center-morel-de-vinde-schemaa",
+  "exteriorCount": 5,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:44:37.430Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_recreation_center_morel_de_vind_sch_maa_956856_exterior1.jpg",
+      "p_recreation_center_morel_de_vind_sch_maa_956856_exterior2.jpg",
+      "p_recreation_center_morel_de_vind_sch_maa_956856_exterior3.jpg",
+      "p_recreation_center_morel_de_vind_sch_maa_956856_exterior4.jpg",
+      "p_recreation_center_morel_de_vind_sch_maa_956856_exterior5.jpg"
+    ],
+    "interiors": [
+      "p_recreation_center_morel_de_vind_sch_maa_956856_interior1.jpg",
+      "p_recreation_center_morel_de_vind_sch_maa_956856_interior2.jpg",
+      "p_recreation_center_morel_de_vind_sch_maa_956856_interior3.jpg",
+      "p_recreation_center_morel_de_vind_sch_maa_956856_interior4.jpg",
+      "p_recreation_center_morel_de_vind_sch_maa_956856_interior5.jpg"
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "projectId": "p_x_museum_studio_nor_1024371",
+  "projectTitle": "X Museum / Studio NOR",
+  "projectUrl": "https://www.archdaily.com/1024371/x-museum-studio-nor",
+  "exteriorCount": 5,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:41:50.393Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_x_museum_studio_nor_1024371_exterior1.jpg",
+      "p_x_museum_studio_nor_1024371_exterior2.jpg",
+      "p_x_museum_studio_nor_1024371_exterior3.jpg",
+      "p_x_museum_studio_nor_1024371_exterior4.jpg",
+      "p_x_museum_studio_nor_1024371_exterior5.jpg"
+    ],
+    "interiors": [
+      "p_x_museum_studio_nor_1024371_interior1.jpg",
+      "p_x_museum_studio_nor_1024371_interior2.jpg",
+      "p_x_museum_studio_nor_1024371_interior3.jpg",
+      "p_x_museum_studio_nor_1024371_interior4.jpg",
+      "p_x_museum_studio_nor_1024371_interior5.jpg"
+    ]
+  }
+}

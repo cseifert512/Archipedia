@@ -1,0 +1,24 @@
+{
+  "projectId": "p_living_places_copenhagen_effekt_1018529",
+  "projectTitle": "Living Places Copenhagen / EFFEKT",
+  "projectUrl": "https://www.archdaily.com/1018529/living-places-copenhagen-effekt",
+  "exteriorCount": 5,
+  "interiorCount": 5,
+  "downloadedAt": "2025-11-04T23:42:15.932Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_living_places_copenhagen_effekt_1018529_exterior1.jpg",
+      "p_living_places_copenhagen_effekt_1018529_exterior2.jpg",
+      "p_living_places_copenhagen_effekt_1018529_exterior3.jpg",
+      "p_living_places_copenhagen_effekt_1018529_exterior4.jpg",
+      "p_living_places_copenhagen_effekt_1018529_exterior5.jpg"
+    ],
+    "interiors": [
+      "p_living_places_copenhagen_effekt_1018529_interior1.jpg",
+      "p_living_places_copenhagen_effekt_1018529_interior2.jpg",
+      "p_living_places_copenhagen_effekt_1018529_interior3.jpg",
+      "p_living_places_copenhagen_effekt_1018529_interior4.jpg",
+      "p_living_places_copenhagen_effekt_1018529_interior5.jpg"
+    ]
+  }
+}

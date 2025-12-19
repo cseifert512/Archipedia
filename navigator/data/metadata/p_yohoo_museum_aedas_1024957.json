@@ -1,0 +1,23 @@
+{
+  "projectId": "p_yohoo_museum_aedas_1024957",
+  "projectTitle": "Yohoo Museum / Aedas",
+  "projectUrl": "https://www.archdaily.com/1024957/yohoo-museum-aedas",
+  "exteriorCount": 5,
+  "interiorCount": 4,
+  "downloadedAt": "2025-11-04T23:41:44.703Z",
+  "fileStructure": {
+    "exteriors": [
+      "p_yohoo_museum_aedas_1024957_exterior1.jpg",
+      "p_yohoo_museum_aedas_1024957_exterior2.jpg",
+      "p_yohoo_museum_aedas_1024957_exterior3.jpg",
+      "p_yohoo_museum_aedas_1024957_exterior4.jpg",
+      "p_yohoo_museum_aedas_1024957_exterior5.jpg"
+    ],
+    "interiors": [
+      "p_yohoo_museum_aedas_1024957_interior1.jpg",
+      "p_yohoo_museum_aedas_1024957_interior2.jpg",
+      "p_yohoo_museum_aedas_1024957_interior3.jpg",
+      "p_yohoo_museum_aedas_1024957_interior4.jpg"
+    ]
+  }
+}

@@ -109,6 +109,13 @@ venv.bak/
 # Project-specific
 ui/node_modules
 navigator/.venv
-navigator/data/**
-!navigator/data/metadata/
-!navigator/data/metadata/projects.csv
+
+# Navigator data - ignore most, keep essential for deployment
+navigator/data/images/
+navigator/data/plans/
+navigator/data/sessions/
+navigator/data/logs/
+navigator/data/metrics/
+navigator/data/flat_import/
+navigator/data/embeddings/image/
+navigator/data/embeddings/patch/
