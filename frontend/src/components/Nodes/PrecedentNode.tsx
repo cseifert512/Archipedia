@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import { PrecedentNodeData, PrecedentProject } from '../../types/nodes';
-import { X, Play, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 
 interface PrecedentNodeProps {
@@ -12,7 +12,7 @@ interface PrecedentNodeProps {
 
 
 export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id }) => {
-  const { deleteNode, updateNode, executeFromNode } = useCanvasStore();
+  const { deleteNode, updateNode } = useCanvasStore();
   const [isDragOver, setIsDragOver] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const projects = data.projects || [];
@@ -47,13 +47,6 @@ export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
     setCurrentIndex((prev) => (prev < projects.length - 1 ? prev + 1 : 0));
-  };
-
-  const handleRun = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (id) {
-      await executeFromNode(id);
-    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -173,37 +166,6 @@ export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id
         </h3>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <button
-            onClick={handleRun}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              background: 'rgba(0,0,0,0.05)',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              padding: '4px 8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              opacity: 0.7,
-              transition: 'opacity 0.2s',
-              fontFamily: 'var(--font-primary)',
-              fontSize: '9px',
-              color: '#000000',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '1';
-              e.currentTarget.style.background = 'rgba(0,0,0,0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '0.7';
-              e.currentTarget.style.background = 'rgba(0,0,0,0.05)';
-            }}
-          >
-            <Play size={10} />
-            RUN
-          </button>
-          <button
             onClick={handleDelete}
             onMouseDown={(e) => e.stopPropagation()}
             style={{
@@ -258,6 +220,14 @@ export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id
           <>
             {/* Project Image Container */}
             <div
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Open project detail page in new tab
+                const projectId = currentProject.id || currentProject.title || 'unknown';
+                console.log('[DEBUG] Double-click opening project:', projectId);
+                window.open(`/project/${encodeURIComponent(projectId)}`, '_blank');
+              }}
               style={{
                 width: '100%',
                 aspectRatio: '16/9',
@@ -267,6 +237,7 @@ export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id
                 border: '1px solid rgba(0,0,0,0.1)',
                 position: 'relative',
                 zIndex: 1,
+                cursor: 'pointer',
               }}
             >
               {currentProject.thumbnail && currentProject.thumbnail.trim() ? (
@@ -277,6 +248,7 @@ export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
+                    pointerEvents: 'none',
                   }}
                   onError={(e) => {
                     // Hide broken image and show fallback
