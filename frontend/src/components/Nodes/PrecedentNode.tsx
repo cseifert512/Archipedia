@@ -256,46 +256,6 @@ export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id
       >
         {currentProject ? (
           <>
-            {/* Stacked Background Effect - Show when multiple projects */}
-            {isStacked && (
-              <>
-                {/* First background layer (most visible) */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    left: '12px',
-                    right: '12px',
-                    bottom: '12px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid rgba(0,0,0,0.15)',
-                    borderRadius: '12px',
-                    opacity: 0.5,
-                    zIndex: 0,
-                    transform: 'translate(8px, 8px)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  }}
-                />
-                {/* Second background layer (subtle) */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    left: '8px',
-                    right: '8px',
-                    bottom: '8px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid rgba(0,0,0,0.1)',
-                    borderRadius: '12px',
-                    opacity: 0.3,
-                    zIndex: 0,
-                    transform: 'translate(16px, 16px)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                  }}
-                />
-              </>
-            )}
-
             {/* Project Image Container */}
             <div
               style={{
