@@ -137,4 +137,48 @@ export async function searchByText(
   return (await res.json()) as NavigatorSearchTextResponse;
 }
 
+export interface ProjectDetails {
+  project_id: string;
+  title: string;
+  country: string;
+  climate_bin: string;
+  typology: string;
+  massing_type: string;
+  wwr_band: string;
+  image_ids: string[];
+  plan_ids?: string[];
+  tags?: string[];
+}
+
+export async function getProjectDetails(projectId: string): Promise<ProjectDetails> {
+  const base = getApiBaseUrl();
+
+  const res = await fetch(`${base}/projects/${encodeURIComponent(projectId)}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Navigator /projects/${projectId} failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  return (await res.json()) as ProjectDetails;
+}
+
+export function getImageUrl(imageId: string): string {
+  // R2 CDN URL pattern for images
+  const R2_BASE = "https://pub-96a82c12e12a4f05b29760410a5e8f45.r2.dev";
+  return `${R2_BASE}/images/${imageId}.jpg`;
+}
+
+export function getThumbnailUrl(imageId: string): string {
+  // R2 CDN URL pattern for thumbnails
+  const R2_BASE = "https://pub-96a82c12e12a4f05b29760410a5e8f45.r2.dev";
+  return `${R2_BASE}/thumbs/${imageId}.jpg`;
+}
+
 

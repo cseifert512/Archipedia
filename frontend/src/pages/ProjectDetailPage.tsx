@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DataQualityIndicator } from "../components/DataQualityIndicator";
 import { ContributionModal } from "../components/ContributionModal";
 import { AdvancedSearchBar } from "../components/AdvancedSearchBar";
@@ -23,39 +23,73 @@ import {
   Clock,
   Users,
   Building,
-  Box
+  Box,
+  Loader2
 } from "lucide-react";
 import { Link, useParams, useLocation } from "wouter";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
-import { mockProjects } from "../lib/mockData";
 import { LensFrame } from "../components/LensFrame";
-
-const projectImages = [
-  { url: "https://images.unsplash.com/photo-1758611228434-7b5b697abd0a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Main entrance", credit: "Photo: Iwan Baan", type: "Exterior view" },
-  { url: "https://images.unsplash.com/photo-1724878019526-91926d24add4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Classroom interior", credit: "Photo: Iwan Baan", type: "Interior view" },
-  { url: "https://images.unsplash.com/photo-1543364972-12a04a63ce01?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Central courtyard", credit: "Photo: Iwan Baan", type: "Exterior view" },
-  { url: "https://images.unsplash.com/photo-1692719224629-317d0bd533f7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Facade detail", credit: "Photo: Iwan Baan", type: "Detail" },
-  { url: "https://images.unsplash.com/photo-1598897270268-f7091c801c3d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Stairwell", credit: "Photo: Iwan Baan", type: "Interior view" },
-  { url: "https://images.unsplash.com/photo-1610650394144-a778795cf585?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080", caption: "Library space", credit: "Photo: Iwan Baan", type: "Interior view" },
-];
+import { getProjectDetails, getImageUrl, getThumbnailUrl, ProjectDetails } from "../lib/navigatorApi";
 
 export function ProjectDetailPage() {
   const params = useParams();
-  const projectId = params.id || "1";
-  const project = mockProjects.find(p => p.id === projectId) || mockProjects[0];
+  const projectId = params.id || "";
   const [, setLocation] = useLocation();
   
   // Parse URL query params for image_id and from context
   const urlParams = new URLSearchParams(window.location.search);
-  const imageIdParam = urlParams.get('image_id');
   const fromContext = urlParams.get('from');
+  
+  // Project data state
+  const [project, setProject] = useState<ProjectDetails | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isContributionModalOpen, setIsContributionModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
 
-  const completeness = 67;
+  // Fetch project data on mount
+  useEffect(() => {
+    async function fetchProject() {
+      if (!projectId) {
+        setError("No project ID provided");
+        setIsLoading(false);
+        return;
+      }
+      
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const data = await getProjectDetails(projectId);
+        setProject(data);
+      } catch (err) {
+        console.error("Failed to fetch project:", err);
+        setError(err instanceof Error ? err.message : "Failed to load project");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    fetchProject();
+  }, [projectId]);
+
+  // Build image URLs from project's image_ids
+  const projectImages = project?.image_ids?.map((imageId, idx) => ({
+    url: getImageUrl(imageId),
+    thumbUrl: getThumbnailUrl(imageId),
+    caption: `Image ${idx + 1}`,
+    credit: "",
+    type: imageId.includes("_interiors_") ? "Interior view" : 
+          imageId.includes("_diagrams_") ? "Diagram" : "Exterior view"
+  })) || [];
+
+  const completeness = project ? 
+    Math.round(((project.title ? 20 : 0) + (project.country ? 20 : 0) + 
+    (project.typology ? 20 : 0) + (project.climate_bin ? 20 : 0) + 
+    (project.image_ids?.length ? 20 : 0))) : 0;
   
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % projectImages.length);
@@ -65,7 +99,6 @@ export function ProjectDetailPage() {
     setCurrentImageIndex((prev) => (prev - 1 + projectImages.length) % projectImages.length);
   };
 
-  const currentImage = projectImages[currentImageIndex];
 
   const sections = [
     { id: "overview", label: "Overview", complete: true },
@@ -84,6 +117,50 @@ export function ProjectDetailPage() {
       setLocation(`/results?${params.toString()}`);
     }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 size={48} className="animate-spin mx-auto mb-4" style={{ color: "var(--accent)" }} />
+          <p style={{ fontFamily: "var(--font-primary)", fontSize: "16px" }}>Loading project...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !project) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertCircle size={48} className="mx-auto mb-4" style={{ color: "#ef4444" }} />
+          <h2 style={{ fontFamily: "var(--font-primary)", fontSize: "24px", marginBottom: "16px" }}>
+            Project Not Found
+          </h2>
+          <p style={{ fontFamily: "var(--font-primary)", fontSize: "14px", color: "rgba(0,0,0,0.6)", marginBottom: "24px" }}>
+            {error || `Could not find project with ID: ${projectId}`}
+          </p>
+          <Link href="/results">
+            <button style={{
+              fontFamily: "var(--font-primary)",
+              backgroundColor: "var(--accent)",
+              color: "#000",
+              padding: "12px 24px",
+              borderRadius: "8px",
+              border: "none",
+              cursor: "pointer"
+            }}>
+              Back to Results
+            </button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const currentImage = projectImages[currentImageIndex] || { url: "", caption: "", credit: "", type: "" };
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] relative overflow-hidden flex flex-col">
@@ -295,21 +372,21 @@ export function ProjectDetailPage() {
                         {fromContext === 'search' ? 'Classic Search' : 'Search Results'}
                       </Link>
                       <span>›</span>
-                      <span style={{ color: "#000000" }}>{project.name}</span>
+                      <span style={{ color: "#000000" }}>{project.title}</span>
                     </div>
                     
                     <h1 className="text-[36px] font-bold mb-3" style={{ 
                       fontFamily: "var(--font-primary)",
                       color: "#000000"
                     }}>
-                      {project.name}
+                      {project.title}
                     </h1>
-                    <a href="#" className="text-[18px] font-medium hover:underline mb-4 inline-block" style={{
+                    <div className="text-[18px] font-medium mb-4 inline-block" style={{
                       fontFamily: "var(--font-primary)",
-                      color: "#000000"
+                      color: "rgba(0,0,0,0.6)"
                     }}>
-                      {project.architect}
-                    </a>
+                      {project.typology}
+                    </div>
                     
                     <div className="flex items-center gap-6 text-[16px]" style={{ 
                       fontFamily: "var(--font-primary)",
@@ -317,11 +394,11 @@ export function ProjectDetailPage() {
                     }}>
                       <div className="flex items-center gap-2">
                         <MapPin size={18} />
-                        <span>{project.location}</span>
+                        <span>{project.country}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Calendar size={18} />
-                        <span>{project.year}</span>
+                        <Layers size={18} />
+                        <span>{project.massing_type}</span>
                       </div>
                     </div>
                   </div>
@@ -465,26 +542,14 @@ export function ProjectDetailPage() {
                     
                     <div className="grid grid-cols-2 gap-x-10 gap-y-6">
                       {[
-                        { label: "Location", value: "Manhattan, New York, NY, USA", status: "verified", source: "Public records, verified 2024" },
-                        { label: "Status", value: <span className="inline-block rounded-full text-[14px]" style={{ 
-                          backgroundColor: "rgba(0,255,0,0.1)",
-                          color: "var(--accent)",
-                          fontFamily: "var(--font-primary)",
-                          padding: "8px 16px"
-                        }}>Built</span>, status: "verified" },
-                        { label: "Completion Year", value: project.year, status: "verified", source: "Architect verified" },
-                        { label: "Budget", value: "$12.5M USD", status: "sourced", source: "Architectural Record, May 2024" },
-                        { label: "Project Type", value: project.buildingType, status: "verified" },
-                        { label: "Climate Zone", value: "Humid Subtropical", status: "verified" },
-                        { label: "Site Area", value: "2,400 m² (25,833 sq ft)", status: "sourced", source: "Public permit records" },
-                        { label: "Certification", value: <span className="inline-block rounded-full text-[14px]" style={{ 
-                          backgroundColor: "rgba(0,255,0,0.1)",
-                          color: "var(--accent)",
-                          fontFamily: "var(--font-primary)",
-                          padding: "8px 16px"
-                        }}>LEED Gold</span>, status: "verified" },
-                        { label: "Building Area", value: "3,200 m² (34,445 sq ft)", status: "sourced", source: "Public permit records" },
-                        { label: "Floors", value: "4 stories + basement", status: "verified" },
+                        { label: "Country", value: project.country, status: "verified", source: "Project metadata" },
+                        { label: "Climate Zone", value: project.climate_bin, status: "verified", source: "Climate analysis" },
+                        { label: "Typology", value: project.typology, status: "verified", source: "Project classification" },
+                        { label: "Massing Type", value: project.massing_type, status: "verified", source: "Design analysis" },
+                        { label: "Window-to-Wall Ratio", value: project.wwr_band, status: "verified", source: "Facade analysis" },
+                        { label: "Images Available", value: `${project.image_ids?.length || 0} images`, status: "verified" },
+                        { label: "Plans Available", value: project.plan_ids?.length ? `${project.plan_ids.length} plans` : "None", status: project.plan_ids?.length ? "verified" : "pending" },
+                        { label: "Tags", value: project.tags?.join(", ") || "None", status: project.tags?.length ? "verified" : "pending" },
                       ].map((item, idx) => (
                         <div key={idx}>
                           <div className="flex items-center gap-2 mb-3">
@@ -580,12 +645,12 @@ export function ProjectDetailPage() {
                   <h3 className="text-[18px] font-semibold mb-10" style={{ fontFamily: "var(--font-primary)" }}>Quick Facts</h3>
                   <div className="space-y-5">
                     {[
-                      { icon: <Building size={22} />, text: "Educational Building" },
-                      { icon: <Calendar size={22} />, text: `Completed ${project.year}` },
-                      { icon: <Ruler size={22} />, text: "3,200 m²" },
-                      { icon: <Layers size={22} />, text: "4 stories" },
-                      { icon: <MapPin size={22} />, text: project.location },
-                      { icon: <Award size={22} />, text: "3 awards" },
+                      { icon: <Building size={22} />, text: project.typology },
+                      { icon: <MapPin size={22} />, text: project.country },
+                      { icon: <Layers size={22} />, text: project.massing_type },
+                      { icon: <Ruler size={22} />, text: project.wwr_band },
+                      { icon: <ImageIcon size={22} />, text: `${project.image_ids?.length || 0} images` },
+                      { icon: <Award size={22} />, text: project.climate_bin },
                     ].map((item, idx) => (
                       <div key={idx} className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{
@@ -646,40 +711,9 @@ export function ProjectDetailPage() {
             }}>
               <div style={{ padding: "48px" }}>
                 <h3 className="text-[24px] font-semibold mb-10" style={{ fontFamily: "var(--font-primary)" }}>Similar Projects</h3>
-                <div className="grid grid-cols-3 gap-10">
-                  {mockProjects.slice(1, 4).map((relatedProject) => (
-                    <Link key={relatedProject.id} href={`/project/${relatedProject.id}`}>
-                      <div className="rounded-xl overflow-hidden cursor-pointer transition-all hover:scale-[1.02]" style={{
-                        backgroundColor: "rgba(255,255,255,0.8)",
-                        backdropFilter: "blur(12px)"
-                      }}>
-                        <ImageWithFallback
-                          src={relatedProject.imageUrl}
-                          alt={relatedProject.name}
-                          className="w-full h-[200px] object-cover"
-                        />
-                        <div style={{ padding: "24px" }}>
-                          <h4 className="text-[16px] font-semibold mb-2" style={{ 
-                            fontFamily: "var(--font-primary)",
-                            lineHeight: "1.4"
-                          }}>{relatedProject.name}</h4>
-                          <p className="text-[14px] mb-3" style={{ 
-                            fontFamily: "var(--font-primary)",
-                            color: "rgba(0,0,0,0.6)"
-                          }}>{relatedProject.architect}</p>
-                          <span className="inline-block rounded-full text-[13px]" style={{
-                            fontFamily: "var(--font-primary)",
-                            backgroundColor: "rgba(0,0,0,0.05)",
-                            color: "#000000",
-                            padding: "6px 12px"
-                          }}>
-                            {relatedProject.matchPercentage}% Match
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                <p className="text-[14px]" style={{ fontFamily: "var(--font-primary)", color: "rgba(0,0,0,0.6)" }}>
+                  Similar projects with matching {project.typology} typology and {project.climate_bin} climate will appear here.
+                </p>
               </div>
             </div>
           </section>
@@ -692,7 +726,7 @@ export function ProjectDetailPage() {
       <ContributionModal
         isOpen={isContributionModalOpen}
         onClose={() => setIsContributionModalOpen(false)}
-        projectName={project.name}
+        projectName={project.title}
       />
     </div>
   );
