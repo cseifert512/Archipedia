@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, ExternalLink, FolderOpen } from 'lucide-react';
-import { useBoardStore, Board, BoardItem } from '../../stores/boardStore';
+import { X, Plus, Trash2, ExternalLink, FolderOpen, Edit3, Share2 } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
+import { useBoardStore, Board, ReferenceBlock } from '../../stores/boardStore';
 
 interface BoardDrawerProps {
   isOpen: boolean;
@@ -8,14 +9,16 @@ interface BoardDrawerProps {
 }
 
 export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
+  const [, setLocation] = useLocation();
   const {
     boards,
     activeBoardId,
     createBoard,
     deleteBoard,
-    renameBoard,
+    updateBoard,
     setActiveBoard,
-    removeItemFromBoard,
+    removeBlock,
+    getReferenceBlocks,
   } = useBoardStore();
 
   const [isCreating, setIsCreating] = useState(false);
@@ -24,6 +27,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
   const [editingName, setEditingName] = useState('');
 
   const activeBoard = boards.find((b) => b.id === activeBoardId);
+  const activeReferenceBlocks = activeBoardId ? getReferenceBlocks(activeBoardId) : [];
 
   const handleCreateBoard = () => {
     if (newBoardName.trim()) {
@@ -35,9 +39,23 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
 
   const handleRenameBoard = (boardId: string) => {
     if (editingName.trim()) {
-      renameBoard(boardId, editingName.trim());
+      updateBoard(boardId, { title: editingName.trim() });
       setEditingBoardId(null);
       setEditingName('');
+    }
+  };
+
+  const handleOpenBoard = () => {
+    if (activeBoard) {
+      onClose();
+      setLocation(`/boards/${activeBoard.id}/edit`);
+    }
+  };
+
+  const handleShareBoard = () => {
+    if (activeBoard) {
+      navigator.clipboard.writeText(`${window.location.origin}/b/${activeBoard.share_token}`);
+      alert('Share link copied to clipboard!');
     }
   };
 
@@ -63,7 +81,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
           top: 0,
           right: 0,
           bottom: 0,
-          width: '360px',
+          width: '380px',
           backgroundColor: 'white',
           boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
           zIndex: 999,
@@ -77,7 +95,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
         <div
           style={{
             padding: '20px 24px',
-            borderBottom: '1px solid rgba(0,0,0,0.1)',
+            borderBottom: '1px solid rgba(0,0,0,0.08)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -114,7 +132,9 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
         <div
           style={{
             padding: '16px 24px',
-            borderBottom: '1px solid rgba(0,0,0,0.1)',
+            borderBottom: '1px solid rgba(0,0,0,0.08)',
+            maxHeight: '280px',
+            overflowY: 'auto',
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -128,7 +148,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                   gap: '12px',
                   padding: '12px 16px',
                   backgroundColor:
-                    board.id === activeBoardId ? 'rgba(182, 68, 36, 0.08)' : 'rgba(0,0,0,0.03)',
+                    board.id === activeBoardId ? 'rgba(182, 68, 36, 0.08)' : 'rgba(0,0,0,0.02)',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   border:
@@ -142,6 +162,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                   size={18}
                   style={{
                     color: board.id === activeBoardId ? 'var(--accent)' : 'rgba(0,0,0,0.4)',
+                    flexShrink: 0,
                   }}
                 />
                 {editingBoardId === board.id ? (
@@ -171,14 +192,17 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                       fontFamily: 'var(--font-secondary)',
                       fontSize: '14px',
                       fontWeight: board.id === activeBoardId ? 500 : 400,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
                       setEditingBoardId(board.id);
-                      setEditingName(board.name);
+                      setEditingName(board.title);
                     }}
                   >
-                    {board.name}
+                    {board.title}
                   </span>
                 )}
                 <span
@@ -186,9 +210,10 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                     fontFamily: 'var(--font-secondary)',
                     fontSize: '12px',
                     color: 'rgba(0,0,0,0.4)',
+                    flexShrink: 0,
                   }}
                 >
-                  {board.items.length}
+                  {board.blocks.filter((b) => b.type === 'reference').length}
                 </span>
                 <button
                   onClick={(e) => {
@@ -204,6 +229,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                     padding: '4px',
                     opacity: 0.4,
                     transition: 'opacity 150ms ease',
+                    flexShrink: 0,
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
                   onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.4')}
@@ -233,7 +259,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                     flex: 1,
                     fontFamily: 'var(--font-secondary)',
                     fontSize: '14px',
-                    padding: '8px 12px',
+                    padding: '10px 12px',
                     border: '1px solid rgba(0,0,0,0.15)',
                     borderRadius: '6px',
                     outline: 'none',
@@ -251,7 +277,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                   style={{
                     fontFamily: 'var(--font-secondary)',
                     fontSize: '12px',
-                    padding: '8px 16px',
+                    padding: '10px 16px',
                     backgroundColor: 'var(--accent)',
                     color: 'white',
                     border: 'none',
@@ -308,7 +334,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                     margin: 0,
                   }}
                 >
-                  {activeBoard.name}
+                  {activeBoard.title}
                 </h3>
                 <span
                   style={{
@@ -317,11 +343,11 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                     color: 'rgba(0,0,0,0.4)',
                   }}
                 >
-                  {activeBoard.items.length} items
+                  {activeReferenceBlocks.length} item{activeReferenceBlocks.length !== 1 ? 's' : ''}
                 </span>
               </div>
 
-              {activeBoard.items.length === 0 ? (
+              {activeReferenceBlocks.length === 0 ? (
                 <div
                   style={{
                     textAlign: 'center',
@@ -343,11 +369,11 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {activeBoard.items.map((item) => (
+                  {activeReferenceBlocks.map((block) => (
                     <BoardItemCard
-                      key={item.board_item_id}
-                      item={item}
-                      onRemove={() => removeItemFromBoard(activeBoard.id, item.board_item_id)}
+                      key={block.id}
+                      block={block}
+                      onRemove={() => removeBlock(activeBoard.id, block.id)}
                     />
                   ))}
                 </div>
@@ -374,38 +400,54 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
           )}
         </div>
 
-        {/* Footer */}
-        {activeBoard && activeBoard.items.length > 0 && (
+        {/* Footer Actions */}
+        {activeBoard && (
           <div
             style={{
               padding: '16px 24px',
-              borderTop: '1px solid rgba(0,0,0,0.1)',
+              borderTop: '1px solid rgba(0,0,0,0.08)',
+              display: 'flex',
+              gap: '10px',
             }}
           >
             <button
-              onClick={() => {
-                // Navigate to board view (future feature)
-                alert('Board view coming soon!');
-              }}
+              onClick={handleOpenBoard}
               style={{
-                width: '100%',
+                flex: 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
                 padding: '12px',
-                backgroundColor: 'rgba(0,0,0,0.05)',
+                backgroundColor: 'var(--accent)',
+                color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 fontFamily: 'var(--font-secondary)',
                 fontSize: '14px',
                 fontWeight: 500,
+                transition: 'opacity 150ms ease',
+              }}
+            >
+              <Edit3 size={16} />
+              Edit Board
+            </button>
+            <button
+              onClick={handleShareBoard}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 16px',
+                backgroundColor: 'rgba(0,0,0,0.05)',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
                 transition: 'background 150ms ease',
               }}
             >
-              <ExternalLink size={16} />
-              Open Board
+              <Share2 size={16} />
             </button>
           </div>
         )}
@@ -414,8 +456,9 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
   );
 }
 
-function BoardItemCard({ item, onRemove }: { item: BoardItem; onRemove: () => void }) {
+function BoardItemCard({ block, onRemove }: { block: ReferenceBlock; onRemove: () => void }) {
   const [isHovered, setIsHovered] = useState(false);
+  const { data } = block;
 
   return (
     <div
@@ -423,7 +466,7 @@ function BoardItemCard({ item, onRemove }: { item: BoardItem; onRemove: () => vo
         display: 'flex',
         gap: '12px',
         padding: '12px',
-        backgroundColor: 'rgba(0,0,0,0.03)',
+        backgroundColor: 'rgba(0,0,0,0.02)',
         borderRadius: '8px',
         position: 'relative',
       }}
@@ -431,8 +474,8 @@ function BoardItemCard({ item, onRemove }: { item: BoardItem; onRemove: () => vo
       onMouseLeave={() => setIsHovered(false)}
     >
       <img
-        src={item.thumb_url}
-        alt={item.title_snapshot}
+        src={data.thumb_url_snapshot}
+        alt={data.title_snapshot}
         style={{
           width: '60px',
           height: '60px',
@@ -454,9 +497,9 @@ function BoardItemCard({ item, onRemove }: { item: BoardItem; onRemove: () => vo
             whiteSpace: 'nowrap',
           }}
         >
-          {item.title_snapshot}
+          {data.title_snapshot}
         </h4>
-        {item.architect_snapshot && (
+        {data.architect_snapshot && (
           <p
             style={{
               fontFamily: 'var(--font-secondary)',
@@ -466,10 +509,10 @@ function BoardItemCard({ item, onRemove }: { item: BoardItem; onRemove: () => vo
               marginBottom: '2px',
             }}
           >
-            {item.architect_snapshot}
+            {data.architect_snapshot}
           </p>
         )}
-        {item.location_snapshot && (
+        {data.location_snapshot && (
           <p
             style={{
               fontFamily: 'var(--font-secondary)',
@@ -478,7 +521,24 @@ function BoardItemCard({ item, onRemove }: { item: BoardItem; onRemove: () => vo
               margin: 0,
             }}
           >
-            {item.location_snapshot}
+            {data.location_snapshot}
+          </p>
+        )}
+        {data.caption && (
+          <p
+            style={{
+              fontFamily: 'var(--font-secondary)',
+              fontSize: '11px',
+              fontStyle: 'italic',
+              color: 'rgba(0,0,0,0.6)',
+              margin: 0,
+              marginTop: '4px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            "{data.caption}"
           </p>
         )}
       </div>
@@ -505,4 +565,3 @@ function BoardItemCard({ item, onRemove }: { item: BoardItem; onRemove: () => vo
     </div>
   );
 }
-

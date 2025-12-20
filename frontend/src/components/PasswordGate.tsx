@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Lock, Unlock, ArrowRight } from "lucide-react";
 import { Input } from "./ui/input";
@@ -6,9 +6,7 @@ import { Input } from "./ui/input";
 const CORRECT_PASSWORD = "Pear";
 const STORAGE_KEY = "demo-unlocked";
 
-interface PasswordGateProps {
-  children: React.ReactNode;
-}
+type PasswordGateProps = React.PropsWithChildren<{}>;
 
 export function PasswordGate({ children }: PasswordGateProps) {
   const [, setLocation] = useLocation();

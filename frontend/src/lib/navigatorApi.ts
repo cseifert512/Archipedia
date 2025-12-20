@@ -170,15 +170,47 @@ export async function getProjectDetails(projectId: string): Promise<ProjectDetai
 }
 
 export function getImageUrl(imageId: string): string {
-  // R2 CDN URL pattern for images
-  const R2_BASE = "https://pub-96a82c12e12a4f05b29760410a5e8f45.r2.dev";
-  return `${R2_BASE}/images/${imageId}.jpg`;
+  // R2 CDN URL for images
+  // Structure: {R2_BASE}/{folder}/{filename}.jpg
+  // Where folder = project_id with category suffix (e.g., p_xxx_exteriors_p_xxx)
+  // And filename = folder + _exterior_N or _interior_N or _diagram_N
+  const R2_BASE = "https://pub-12350662edb244568152a5b72ed1dbb8.r2.dev";
+  
+  // Strip 'i_' prefix if present
+  const cleanId = imageId.startsWith('i_') ? imageId.slice(2) : imageId;
+  
+  // The cleanId format is: {folder}_{folder}_{type}_{N}
+  // Example: p_xxx_exteriors_p_xxx_p_xxx_exteriors_p_xxx_exterior_1
+  // We need to extract folder and construct: {folder}/{folder}_{type}_{N}.jpg
+  
+  // Find the type suffix (exterior_N, interior_N, diagram_N) at the end
+  const suffixMatch = cleanId.match(/_(exterior|interior|diagram)_(\d+)$/);
+  if (suffixMatch) {
+    const suffix = suffixMatch[0]; // e.g., "_exterior_1"
+    const beforeSuffix = cleanId.slice(0, -suffix.length);
+    
+    // beforeSuffix is {folder}_{folder} - we split at midpoint
+    // The format is: folder + "_" + folder, so length = 2*folder.length + 1
+    // midpoint gives us the underscore position
+    const midpoint = Math.floor(beforeSuffix.length / 2);
+    const firstHalf = beforeSuffix.slice(0, midpoint);
+    const secondHalf = beforeSuffix.slice(midpoint);
+    
+    // Check if they match (secondHalf starts with underscore and rest equals firstHalf)
+    if (secondHalf.startsWith('_') && firstHalf === secondHalf.slice(1)) {
+      const folder = firstHalf;
+      const filename = folder + suffix;
+      return `${R2_BASE}/${folder}/${filename}.jpg`;
+    }
+  }
+  
+  // Fallback: try to use as-is (won't work but provides a URL)
+  return `${R2_BASE}/${cleanId}/${cleanId}.jpg`;
 }
 
 export function getThumbnailUrl(imageId: string): string {
-  // R2 CDN URL pattern for thumbnails
-  const R2_BASE = "https://pub-96a82c12e12a4f05b29760410a5e8f45.r2.dev";
-  return `${R2_BASE}/thumbs/${imageId}.jpg`;
+  // Thumbnails use the same URL as full images
+  return getImageUrl(imageId);
 }
 
 

@@ -34,7 +34,9 @@ export function DataQualityIndicator({ type, source }: DataQualityIndicatorProps
     },
   };
 
-  const { icon: Icon, color, label } = config[type];
+  // Fallback for unknown types
+  const configEntry = config[type] || config.missing;
+  const { icon: Icon, color, label } = configEntry;
 
   return (
     <div 

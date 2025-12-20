@@ -80,11 +80,19 @@ export function ClassicSearchPage() {
     if (emphasis !== 'balanced') params.set('emphasis', emphasis);
 
     const qs = params.toString();
-    const newUrl = qs ? `/search?${qs}` : '/search';
+    const newUrl = qs ? `/search/classic?${qs}` : '/search/classic';
 
     // Update URL without navigation
     window.history.replaceState(null, '', newUrl);
   }, [query, filters.typology, filters.country, emphasis]);
+
+  // Auto-search if query is present on mount (from landing page redirect)
+  useEffect(() => {
+    if (initialQuery.trim()) {
+      performSearch(initialQuery, null, initialEmphasis);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   // Perform search
   const performSearch = useCallback(
@@ -278,11 +286,13 @@ export function ClassicSearchPage() {
     saveToActiveBoard({
       project_id: result.project_id,
       image_id: imageToSave.image_id,
-      thumb_url: imageToSave.thumb_url,
+      thumb_url_snapshot: imageToSave.thumb_url,
+      image_url_snapshot: imageToSave.image_url,
       title_snapshot: result.project_title,
       architect_snapshot: result.architect,
       location_snapshot: result.location_display,
-      source_context: {
+      year_snapshot: result.year,
+      added_from: {
         query,
         filters: {
           typology: filters.typology,
@@ -307,7 +317,10 @@ export function ClassicSearchPage() {
   // Check if an item is saved
   const isItemSaved = (projectId: string) => {
     const activeBoard = boards.find((b) => b.id === activeBoardId);
-    return activeBoard?.items.some((item) => item.project_id === projectId) || false;
+    if (!activeBoard) return false;
+    return activeBoard.blocks.some(
+      (block) => block.type === 'reference' && block.data.project_id === projectId
+    );
   };
 
   return (
@@ -398,7 +411,7 @@ export function ClassicSearchPage() {
                     borderRadius: '8px',
                   }}
                 >
-                  {boards.reduce((acc, b) => acc + b.items.length, 0)}
+                  {boards.reduce((acc, b) => acc + (b.blocks?.length || 0), 0)}
                 </span>
               )}
             </button>
