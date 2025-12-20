@@ -749,6 +749,23 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
         if not thumb_url:
             thumb_url = r.get("thumb_url")
         
+        # Get image_ids from projects.csv for carousel
+        image_ids = []
+        base_pid = extract_base_project_id(project_id)
+        if faiss_store._projects is not None and not faiss_store._projects.empty:
+            matching = faiss_store._projects[faiss_store._projects['project_id'].str.startswith(base_pid)]
+            if not matching.empty:
+                raw_ids = matching.iloc[0].get('image_ids', '')
+                if pd.notna(raw_ids) and str(raw_ids).strip():
+                    raw_str = str(raw_ids)
+                    if raw_str.startswith('['):
+                        try:
+                            image_ids = json.loads(raw_str.replace("'", '"'))
+                        except:
+                            image_ids = [x.strip() for x in raw_str.split('|') if x.strip()]
+                    else:
+                        image_ids = [x.strip() for x in raw_str.split('|') if x.strip()]
+        
         raw_title = r.get("title", "")
         result = {
             "rank": len(hydrated_results) + 1,
@@ -762,6 +779,7 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
             "climate_bin": r.get("climate_bin"),
             "massing_type": r.get("massing_type"),
             "thumb_url": thumb_url,
+            "image_ids": image_ids[:8],  # Limit to 8 images for carousel
         }
         
         hydrated_results.append(result)

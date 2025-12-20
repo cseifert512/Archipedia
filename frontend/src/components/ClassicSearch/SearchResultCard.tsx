@@ -138,8 +138,8 @@ export function SearchResultCard({
           </div>
         )}
 
-        {/* Image Navigation Arrows */}
-        {isHovered && hasMultipleImages && (
+        {/* Image Navigation Arrows - Always visible when multiple images */}
+        {hasMultipleImages && (
           <>
             <button
               onClick={handlePrevImage}
@@ -148,22 +148,21 @@ export function SearchResultCard({
                 left: '8px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                width: '28px',
-                height: '28px',
+                width: '32px',
+                height: '32px',
                 borderRadius: '50%',
-                backgroundColor: 'rgba(255,255,255,0.85)',
+                backgroundColor: 'rgba(80, 80, 80, 0.3)',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'all 150ms ease',
-                opacity: 0.5,
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.5')}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(80, 80, 80, 0.9)')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(80, 80, 80, 0.3)')}
             >
-              <ChevronLeft size={18} style={{ color: '#555' }} />
+              <ChevronLeft size={18} style={{ color: '#fff' }} />
             </button>
             <button
               onClick={handleNextImage}
@@ -172,28 +171,27 @@ export function SearchResultCard({
                 right: '8px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                width: '28px',
-                height: '28px',
+                width: '32px',
+                height: '32px',
                 borderRadius: '50%',
-                backgroundColor: 'rgba(255,255,255,0.85)',
+                backgroundColor: 'rgba(80, 80, 80, 0.3)',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'all 150ms ease',
-                opacity: 0.5,
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.5')}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(80, 80, 80, 0.9)')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(80, 80, 80, 0.3)')}
             >
-              <ChevronRight size={18} style={{ color: '#555' }} />
+              <ChevronRight size={18} style={{ color: '#fff' }} />
             </button>
           </>
         )}
 
-        {/* Image Indicator Dots */}
-        {isHovered && hasMultipleImages && (
+        {/* Image Indicator Dots - Always visible when multiple images */}
+        {hasMultipleImages && (
           <div
             style={{
               position: 'absolute',
@@ -201,17 +199,18 @@ export function SearchResultCard({
               left: '50%',
               transform: 'translateX(-50%)',
               display: 'flex',
-              gap: '4px',
+              gap: '5px',
             }}
           >
             {images.map((_, idx) => (
               <div
                 key={idx}
                 style={{
-                  width: '6px',
-                  height: '6px',
+                  width: '7px',
+                  height: '7px',
                   borderRadius: '50%',
-                  backgroundColor: idx === currentImageIndex ? 'white' : 'rgba(255,255,255,0.5)',
+                  backgroundColor: idx === currentImageIndex ? 'white' : 'rgba(255,255,255,0.4)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                   transition: 'all 150ms ease',
                 }}
               />

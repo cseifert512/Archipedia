@@ -127,18 +127,33 @@ export function ClassicSearchPage() {
           apiResults = response.results || [];
         }
 
+        // Helper to build R2 image URL from image_id
+        const getImageUrl = (imageId: string) => 
+          `https://pub-8a79b54e42e341729c6ad0525ad3a75a.r2.dev/thumbnails/${imageId}.jpg`;
+
         // Transform API results to SearchResultData format
         const transformedResults: SearchResultData[] = apiResults.map((result, index) => {
           const score = result.score ?? (1 - (result.distance ?? 0.5));
           const thumbUrl = toAbsoluteUrl(result.thumb_url) || '';
 
-          const projectImages: ProjectImage[] = [
-            {
-              image_id: result.image_id || `img_${result.project_id}_01`,
-              thumb_url: thumbUrl,
-              image_url: thumbUrl,
-            },
-          ];
+          // Build images array from image_ids if available
+          let projectImages: ProjectImage[] = [];
+          if (result.image_ids && Array.isArray(result.image_ids) && result.image_ids.length > 0) {
+            projectImages = result.image_ids.map((imgId: string) => ({
+              image_id: imgId,
+              thumb_url: getImageUrl(imgId),
+              image_url: getImageUrl(imgId),
+            }));
+          } else {
+            // Fallback to single image
+            projectImages = [
+              {
+                image_id: result.image_id || `img_${result.project_id}_01`,
+                thumb_url: thumbUrl,
+                image_url: thumbUrl,
+              },
+            ];
+          }
 
           return {
             project_id: result.project_id || `project-${index}`,
@@ -147,8 +162,8 @@ export function ClassicSearchPage() {
             location_display: result.country || 'Unknown Location',
             year: result.year || 2024,
             image_id: result.image_id || `img_${result.project_id}_01`,
-            thumb_url: thumbUrl,
-            image_url: thumbUrl,
+            thumb_url: projectImages[0]?.thumb_url || thumbUrl,
+            image_url: projectImages[0]?.image_url || thumbUrl,
             images: projectImages,
             score: score,
             match_reason:
