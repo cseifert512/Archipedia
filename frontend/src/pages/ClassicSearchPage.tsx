@@ -127,25 +127,21 @@ export function ClassicSearchPage() {
           apiResults = response.results || [];
         }
 
-        // Helper to build R2 image URL from image_id
-        const getImageUrl = (imageId: string) => 
-          `https://pub-8a79b54e42e341729c6ad0525ad3a75a.r2.dev/thumbnails/${imageId}.jpg`;
-
         // Transform API results to SearchResultData format
         const transformedResults: SearchResultData[] = apiResults.map((result, index) => {
           const score = result.score ?? (1 - (result.distance ?? 0.5));
           const thumbUrl = toAbsoluteUrl(result.thumb_url) || '';
 
-          // Build images array from image_ids if available
+          // Build images array from image_urls (full R2 URLs) if available
           let projectImages: ProjectImage[] = [];
-          if (result.image_ids && Array.isArray(result.image_ids) && result.image_ids.length > 0) {
-            projectImages = result.image_ids.map((imgId: string) => ({
-              image_id: imgId,
-              thumb_url: getImageUrl(imgId),
-              image_url: getImageUrl(imgId),
+          if (result.image_urls && Array.isArray(result.image_urls) && result.image_urls.length > 0) {
+            projectImages = result.image_urls.map((url: string, idx: number) => ({
+              image_id: `img_${result.project_id}_${idx}`,
+              thumb_url: url,
+              image_url: url,
             }));
-          } else {
-            // Fallback to single image
+          } else if (thumbUrl) {
+            // Fallback to single thumbnail
             projectImages = [
               {
                 image_id: result.image_id || `img_${result.project_id}_01`,

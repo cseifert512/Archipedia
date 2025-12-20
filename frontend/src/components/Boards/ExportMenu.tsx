@@ -19,78 +19,33 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
     error?: string;
   } | null>(null);
 
-  const handleExport = async () => {
-    setIsExporting(true);
-    setExportResult(null);
-
-    try {
-      // Try server-side PDF generation first
-      const apiBase =
-        (import.meta as any).env?.VITE_API_BASE_URL?.trim()?.replace(/\/+$/, '') ||
-        'http://localhost:8000';
-      const frontendUrl = window.location.origin;
-
-      const response = await fetch(`${apiBase}/boards/${boardId}/export`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mode,
-          format: mode === 'slides' ? '16:9' : format,
-          frontend_url: frontendUrl,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.ok && data.download_url) {
-        setExportResult({
-          success: true,
-          url: `${apiBase}${data.download_url}`,
-        });
-      } else if (data.error?.includes('not available') || data.error?.includes('Playwright')) {
-        // Fallback to browser print dialog
-        handleBrowserPrint();
-      } else {
-        setExportResult({
-          success: false,
-          error: data.error || 'Export failed',
-        });
-      }
-    } catch (error) {
-      // Network error or server unavailable - fallback to browser print
-      console.warn('Server export failed, using browser print:', error);
-      handleBrowserPrint();
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   const handleBrowserPrint = () => {
     // Open print page in new window and trigger print dialog
     const printUrl = `/boards/${boardId}/print?mode=${mode}&format=${mode === 'slides' ? '16:9' : format}`;
     const printWindow = window.open(printUrl, '_blank');
     
     if (printWindow) {
-      // Wait for page to load, then trigger print
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 1000); // Give time for images to load
-      };
-      
       setExportResult({
         success: true,
         url: undefined, // No download URL, using browser print
       });
+      onClose();
     } else {
       setExportResult({
         success: false,
         error: 'Could not open print window. Please allow popups for this site.',
       });
     }
-    onClose();
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    setExportResult(null);
+
+    // For now, just use browser print - it's more reliable across deployments
+    // The user can use the browser's "Save as PDF" option
+    handleBrowserPrint();
+    setIsExporting(false);
   };
 
   return (

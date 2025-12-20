@@ -749,22 +749,20 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
         if not thumb_url:
             thumb_url = r.get("thumb_url")
         
-        # Get image_ids from projects.csv for carousel
-        image_ids = []
+        # Get image URLs from id_map for carousel (use actual R2 URLs)
+        image_urls = []
         base_pid = extract_base_project_id(project_id)
-        if faiss_store._projects is not None and not faiss_store._projects.empty:
-            matching = faiss_store._projects[faiss_store._projects['project_id'].str.startswith(base_pid)]
-            if not matching.empty:
-                raw_ids = matching.iloc[0].get('image_ids', '')
-                if pd.notna(raw_ids) and str(raw_ids).strip():
-                    raw_str = str(raw_ids)
-                    if raw_str.startswith('['):
-                        try:
-                            image_ids = json.loads(raw_str.replace("'", '"'))
-                        except:
-                            image_ids = [x.strip() for x in raw_str.split('|') if x.strip()]
-                    else:
-                        image_ids = [x.strip() for x in raw_str.split('|') if x.strip()]
+        if faiss_store._idmap:
+            for idx, meta in faiss_store._idmap.items():
+                if not isinstance(meta, dict):
+                    continue
+                meta_pid = meta.get("project_id", "")
+                if meta_pid.startswith(base_pid) or base_pid in meta_pid:
+                    thumb = meta.get("thumb")
+                    if thumb and thumb not in image_urls:
+                        image_urls.append(thumb)
+                        if len(image_urls) >= 8:
+                            break
         
         raw_title = r.get("title", "")
         result = {
@@ -779,7 +777,7 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
             "climate_bin": r.get("climate_bin"),
             "massing_type": r.get("massing_type"),
             "thumb_url": thumb_url,
-            "image_ids": image_ids[:8],  # Limit to 8 images for carousel
+            "image_urls": image_urls,  # Full R2 URLs for carousel
         }
         
         hydrated_results.append(result)

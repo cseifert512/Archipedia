@@ -148,21 +148,20 @@ export function SearchResultCard({
                 left: '8px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(80, 80, 80, 0.3)',
+                padding: '4px',
+                backgroundColor: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'all 150ms ease',
+                transition: 'opacity 150ms ease',
+                opacity: 0.3,
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(80, 80, 80, 0.9)')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(80, 80, 80, 0.3)')}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.3')}
             >
-              <ChevronLeft size={18} style={{ color: '#fff' }} />
+              <ChevronLeft size={24} style={{ color: '#fff', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
             </button>
             <button
               onClick={handleNextImage}
@@ -171,21 +170,20 @@ export function SearchResultCard({
                 right: '8px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(80, 80, 80, 0.3)',
+                padding: '4px',
+                backgroundColor: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'all 150ms ease',
+                transition: 'opacity 150ms ease',
+                opacity: 0.3,
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(80, 80, 80, 0.9)')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(80, 80, 80, 0.3)')}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.3')}
             >
-              <ChevronRight size={18} style={{ color: '#fff' }} />
+              <ChevronRight size={24} style={{ color: '#fff', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
             </button>
           </>
         )}
