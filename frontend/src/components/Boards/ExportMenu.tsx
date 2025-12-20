@@ -24,6 +24,7 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
     setExportResult(null);
 
     try {
+      // Try server-side PDF generation first
       const apiBase =
         (import.meta as any).env?.VITE_API_BASE_URL?.trim()?.replace(/\/+$/, '') ||
         'http://localhost:8000';
@@ -48,6 +49,9 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
           success: true,
           url: `${apiBase}${data.download_url}`,
         });
+      } else if (data.error?.includes('not available') || data.error?.includes('Playwright')) {
+        // Fallback to browser print dialog
+        handleBrowserPrint();
       } else {
         setExportResult({
           success: false,
@@ -55,13 +59,38 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
         });
       }
     } catch (error) {
-      setExportResult({
-        success: false,
-        error: error instanceof Error ? error.message : 'Export failed',
-      });
+      // Network error or server unavailable - fallback to browser print
+      console.warn('Server export failed, using browser print:', error);
+      handleBrowserPrint();
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleBrowserPrint = () => {
+    // Open print page in new window and trigger print dialog
+    const printUrl = `/boards/${boardId}/print?mode=${mode}&format=${mode === 'slides' ? '16:9' : format}`;
+    const printWindow = window.open(printUrl, '_blank');
+    
+    if (printWindow) {
+      // Wait for page to load, then trigger print
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 1000); // Give time for images to load
+      };
+      
+      setExportResult({
+        success: true,
+        url: undefined, // No download URL, using browser print
+      });
+    } else {
+      setExportResult({
+        success: false,
+        error: 'Could not open print window. Please allow popups for this site.',
+      });
+    }
+    onClose();
   };
 
   return (
@@ -238,22 +267,35 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
                         color: '#22c55e',
                       }}
                     >
-                      Export Complete
+                      {exportResult.url ? 'Export Complete' : 'Print Dialog Opened'}
                     </span>
                   </div>
-                  <a
-                    href={exportResult.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      fontFamily: 'var(--font-secondary)',
-                      fontSize: '13px',
-                      color: 'var(--accent)',
-                      textDecoration: 'underline',
-                    }}
-                  >
-                    Download PDF
-                  </a>
+                  {exportResult.url ? (
+                    <a
+                      href={exportResult.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontFamily: 'var(--font-secondary)',
+                        fontSize: '13px',
+                        color: 'var(--accent)',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      Download PDF
+                    </a>
+                  ) : (
+                    <p
+                      style={{
+                        fontFamily: 'var(--font-secondary)',
+                        fontSize: '13px',
+                        color: 'rgba(0,0,0,0.6)',
+                        margin: 0,
+                      }}
+                    >
+                      Use your browser's print dialog to save as PDF.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <p

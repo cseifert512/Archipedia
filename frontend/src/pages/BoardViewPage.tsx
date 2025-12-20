@@ -69,15 +69,22 @@ export function BoardViewPage() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Link href="/search">
-              <button
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 12px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
+            <button
+              onClick={() => {
+                // Use browser history to go back to the previous page
+                if (window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  setLocation('/search');
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 12px',
+                backgroundColor: 'transparent',
+                border: 'none',
                   cursor: 'pointer',
                   fontFamily: 'var(--font-secondary)',
                   fontSize: '14px',
@@ -87,7 +94,6 @@ export function BoardViewPage() {
                 <ArrowLeft size={18} />
                 Back
               </button>
-            </Link>
             <div>
               <h1
                 style={{

@@ -131,23 +131,29 @@ export function BoardEditPage() {
       >
         {/* Left Section */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Link href="/search">
-            <button
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '36px',
-                height: '36px',
-                backgroundColor: 'transparent',
-                border: '1px solid rgba(0,0,0,0.1)',
-                borderRadius: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              <ArrowLeft size={18} />
-            </button>
-          </Link>
+          <button
+            onClick={() => {
+              // Use browser history to go back to the previous page
+              if (window.history.length > 1) {
+                window.history.back();
+              } else {
+                setLocation('/search');
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '36px',
+              backgroundColor: 'transparent',
+              border: '1px solid rgba(0,0,0,0.1)',
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            <ArrowLeft size={18} />
+          </button>
 
           {/* Editable Title */}
           {editingTitle ? (
