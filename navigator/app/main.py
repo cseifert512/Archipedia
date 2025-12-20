@@ -7,6 +7,7 @@ import os, time, json
 from datetime import datetime, timezone
 import threading
 import numpy as np
+import pandas as pd
 from PIL import Image
 from io import BytesIO
 import requests
@@ -19,6 +20,7 @@ from app.session import SessionStore, generate_query_id, compute_weight_nudges, 
 from app.models import Feedback, Weights
 from app.config import settings
 from app.services.text_embedder import get_text_index, embed_text
+from app.routers import boards as boards_router
 
 # Spatial feature computation imports
 try:
@@ -35,6 +37,9 @@ except ImportError:
 DATA_DIR = settings.data_dir
 app = FastAPI(title="Design Precedent Navigator API", version="0.2.0")
 logger = logging.getLogger("navigator")
+
+# Include routers
+app.include_router(boards_router.router, tags=["boards"])
 
 # ---- debug-mode logger (writes NDJSON to the session log file) ----
 def _agent_debug_log(hypothesis_id: str, location: str, message: str, data: dict, run_id: str = "pre-fix"):
