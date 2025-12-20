@@ -517,25 +517,7 @@ def search_id(body: SearchById, _: bool = Depends(require_token)):
         "debug": debug
     }
 
-@app.get("/projects")
-def list_projects(_: bool = Depends(require_token)):
-    """Get all projects with their metadata"""
-    store = get_store()
-    if store._projects is None or store._projects.empty:
-        return []
-    
-    projects = []
-    for _, row in store._projects.iterrows():
-        projects.append({
-            "project_id": row.get("project_id"),
-            "title": row.get("title"),
-            "country": row.get("country"),
-            "typology": row.get("typology"),
-            "climate_bin": row.get("climate_bin"),
-            "massing_type": row.get("massing_type"),
-            "wwr_band": row.get("wwr_band")
-        })
-    return projects
+import re
 
 
 def extract_base_project_id(project_id: str) -> str:
@@ -545,6 +527,68 @@ def extract_base_project_id(project_id: str) -> str:
             # Take the part before the suffix
             return project_id.split(suffix)[0]
     return project_id
+
+
+def clean_project_title(raw_title: str) -> str:
+    """Clean up project titles from raw URL-derived formats."""
+    if not raw_title:
+        return "Unknown Project"
+    
+    # Step 1: Remove suffixes like ' Exteriors P ...' or ' Diagrams P ...'
+    for suffix in [' Exteriors P ', ' Interiors P ', ' Diagrams P ']:
+        if suffix in raw_title:
+            raw_title = raw_title.split(suffix)[0]
+            break
+    
+    # Step 2: Remove ArchDaily ID (6-7 digit number at end)
+    raw_title = re.sub(r'[\s_]+\d{6,7}$', '', raw_title)
+    
+    # Step 3: Remove known architect abbreviations at end of title
+    abbrevs = ['Ksm Arc', 'Arc', 'Ltd', 'Ass', 'Territo', 'Ofic', 'Luo', 'Erh', 'Khaa', 'N K', 'Alt N K']
+    for abbr in abbrevs:
+        pattern = r'[\s_]+' + re.escape(abbr) + r'$'
+        raw_title = re.sub(pattern, '', raw_title, flags=re.IGNORECASE)
+    
+    # Step 4: Replace underscores with spaces and clean up
+    raw_title = raw_title.replace('_', ' ')
+    raw_title = ' '.join(raw_title.split())
+    
+    # Step 5: Remove 'p ' prefix if present
+    if raw_title.lower().startswith('p '):
+        raw_title = raw_title[2:]
+    
+    # Step 6: Proper title case, but preserve acronyms
+    words = raw_title.split()
+    result = []
+    for w in words:
+        if w.upper() in ['AI', 'II', 'III', 'IV', 'V', 'USA', 'UK', 'NYC']:
+            result.append(w.upper())
+        else:
+            result.append(w.title())
+    
+    return ' '.join(result) if result else "Unknown Project"
+
+
+@app.get("/projects")
+def list_projects(_: bool = Depends(require_token)):
+    """Get all projects with their metadata"""
+    store = get_store()
+    if store._projects is None or store._projects.empty:
+        return []
+    
+    projects = []
+    for _, row in store._projects.iterrows():
+        raw_title = row.get("title", "")
+        projects.append({
+            "project_id": row.get("project_id"),
+            "title": clean_project_title(raw_title) if raw_title else "Unknown Project",
+            "country": row.get("country"),
+            "typology": row.get("typology"),
+            "climate_bin": row.get("climate_bin"),
+            "massing_type": row.get("massing_type"),
+            "wwr_band": row.get("wwr_band")
+        })
+    return projects
 
 
 @app.get("/projects/{project_id}")
@@ -600,9 +644,13 @@ def get_project(project_id: str, _: bool = Depends(require_token)):
         else:
             tags = [x.strip() for x in raw.split('|') if x.strip()]
     
+    # Clean the title before returning
+    raw_title = str(row.get('title', ''))
+    cleaned_title = clean_project_title(raw_title)
+    
     return {
         "project_id": str(row.get('project_id', '')),
-        "title": str(row.get('title', '')),
+        "title": cleaned_title,
         "country": str(row.get('country', '')),
         "climate_bin": str(row.get('climate_bin', '')),
         "typology": str(row.get('typology', '')),
@@ -701,13 +749,14 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
         if not thumb_url:
             thumb_url = r.get("thumb_url")
         
+        raw_title = r.get("title", "")
         result = {
             "rank": len(hydrated_results) + 1,
             "score": r.get("score", 0.0),
             "distance": 1.0 - r.get("score", 0.0),  # Convert similarity to distance
             "project_id": project_id,
             "image_id": f"text_{project_id}",  # Synthetic image_id for compatibility
-            "title": r.get("title"),
+            "title": clean_project_title(raw_title) if raw_title else "Unknown Project",
             "country": r.get("country"),
             "typology": r.get("typology"),
             "climate_bin": r.get("climate_bin"),
