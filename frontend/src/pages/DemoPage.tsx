@@ -29,7 +29,7 @@ export function DemoPage() {
 
   const handleTryLiveDemo = () => {
     trackLandingEvent("try_live_demo_click", {});
-    setLocation("/canvas");
+    setLocation("/search");
   };
 
   const handleBookPilot = () => {

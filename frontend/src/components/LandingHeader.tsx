@@ -8,7 +8,7 @@ interface LandingHeaderProps {
 }
 
 const NAV_LINKS = [
-  { label: "Live Demo", href: "/canvas" },
+  { label: "Live Demo", href: "/search" },
   { label: "Contact", href: "#contact" },
 ];
 
