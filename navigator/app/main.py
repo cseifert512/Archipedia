@@ -600,64 +600,79 @@ def get_project(project_id: str, _: bool = Depends(require_token)):
     
     df = store._projects
     
-    # Try exact match first
-    matching = df[df['project_id'] == project_id]
+    # Extract base project ID to find all related rows (exteriors, interiors, diagrams)
+    base_id = extract_base_project_id(project_id)
     
-    # If not found, try with base project ID (strip _exteriors_, _interiors_, _diagrams_)
-    if matching.empty:
-        base_id = extract_base_project_id(project_id)
-        if base_id != project_id:
-            matching = df[df['project_id'] == base_id]
+    # Find ALL rows that match this base project ID (includes exteriors, interiors, diagrams)
+    matching = df[df['project_id'].str.contains(base_id, regex=False)]
     
-    # Still not found? Try prefix matching
+    # If no matches found, try exact match as fallback
     if matching.empty:
-        base_id = extract_base_project_id(project_id)
-        matching = df[df['project_id'].str.startswith(base_id)]
+        matching = df[df['project_id'] == project_id]
     
     if matching.empty:
         raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
     
+    # Use first row for metadata
     row = matching.iloc[0].to_dict()
     
-    # Parse image_ids
-    image_ids = []
-    if row.get('image_ids') and pd.notna(row['image_ids']):
-        raw = str(row['image_ids'])
-        # Handle JSON array format
-        if raw.startswith('['):
-            try:
-                image_ids = json.loads(raw.replace("'", '"'))
-            except:
-                image_ids = [x.strip() for x in raw.split('|') if x.strip()]
-        else:
-            image_ids = [x.strip() for x in raw.split('|') if x.strip()]
+    # Collect ALL image_ids from ALL matching rows (exteriors + interiors + diagrams)
+    all_image_ids = []
+    seen_ids = set()  # Avoid duplicates
     
-    # Parse tags
-    tags = []
-    if row.get('tags') and pd.notna(row['tags']):
-        raw = str(row['tags'])
-        if raw.startswith('['):
-            try:
-                tags = json.loads(raw.replace("'", '"'))
-            except:
+    for _, match_row in matching.iterrows():
+        row_ids = match_row.get('image_ids')
+        if row_ids and pd.notna(row_ids):
+            raw = str(row_ids)
+            # Handle JSON array format
+            if raw.startswith('['):
+                try:
+                    ids = json.loads(raw.replace("'", '"'))
+                except:
+                    ids = [x.strip() for x in raw.split('|') if x.strip()]
+            else:
+                ids = [x.strip() for x in raw.split('|') if x.strip()]
+            
+            # Add unique IDs
+            for img_id in ids:
+                if img_id not in seen_ids:
+                    seen_ids.add(img_id)
+                    all_image_ids.append(img_id)
+    
+    # Parse tags (combine from all rows, dedupe)
+    all_tags = []
+    seen_tags = set()
+    for _, match_row in matching.iterrows():
+        row_tags = match_row.get('tags')
+        if row_tags and pd.notna(row_tags):
+            raw = str(row_tags)
+            if raw.startswith('['):
+                try:
+                    tags = json.loads(raw.replace("'", '"'))
+                except:
+                    tags = [x.strip() for x in raw.split('|') if x.strip()]
+            else:
                 tags = [x.strip() for x in raw.split('|') if x.strip()]
-        else:
-            tags = [x.strip() for x in raw.split('|') if x.strip()]
+            
+            for tag in tags:
+                if tag not in seen_tags:
+                    seen_tags.add(tag)
+                    all_tags.append(tag)
     
     # Clean the title before returning
     raw_title = str(row.get('title', ''))
     cleaned_title = clean_project_title(raw_title)
     
     return {
-        "project_id": str(row.get('project_id', '')),
+        "project_id": base_id,  # Return the clean base project ID
         "title": cleaned_title,
         "country": str(row.get('country', '')),
         "climate_bin": str(row.get('climate_bin', '')),
         "typology": str(row.get('typology', '')),
         "massing_type": str(row.get('massing_type', '')),
         "wwr_band": str(row.get('wwr_band', '')),
-        "image_ids": image_ids,
-        "tags": tags,
+        "image_ids": all_image_ids,  # Combined images from all rows
+        "tags": all_tags,  # Combined tags from all rows
         "architect": str(row.get('architect', '')) if row.get('architect') and pd.notna(row.get('architect')) else None,
         "city": str(row.get('city', '')) if row.get('city') and pd.notna(row.get('city')) else None,
         "year_completed": int(row['year_completed']) if row.get('year_completed') and pd.notna(row.get('year_completed')) else None,

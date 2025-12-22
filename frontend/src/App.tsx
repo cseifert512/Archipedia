@@ -14,6 +14,8 @@ import { BoardViewPage } from "./pages/BoardViewPage";
 import { BoardEditPage } from "./pages/BoardEditPage";
 import { BoardSharePage } from "./pages/BoardSharePage";
 import { BoardPrintPage } from "./pages/BoardPrintPage";
+import { StudySearchPage } from "./pages/StudySearchPage";
+import { StudyResultsPage } from "./pages/StudyResultsPage";
 import { Toaster } from "./components/ui/sonner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PasswordGate } from "./components/PasswordGate";
@@ -38,6 +40,9 @@ export default function App() {
         <Route path="/results" component={ResultsPage} />
         <Route path="/empty" component={EmptyResultsPage} />
         <Route path="/project/:id" component={ProjectDetailPage} />
+        {/* Anonymous Study Routes - No branding for academic research */}
+        <Route path="/study" component={StudySearchPage} />
+        <Route path="/study/results" component={StudyResultsPage} />
         {/* Board Routes */}
         <Route path="/boards/:id/edit" component={BoardEditPage} />
         <Route path="/boards/:id/print" component={BoardPrintPage} />
