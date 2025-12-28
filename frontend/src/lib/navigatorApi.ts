@@ -44,6 +44,45 @@ export interface NavigatorSearchTextResponse {
   debug?: Record<string, any>;
 }
 
+// Structured error from API
+export interface ApiErrorDetail {
+  error: string;
+  message: string;
+  suggestion?: string;
+}
+
+export class SearchError extends Error {
+  code: string;
+  suggestion?: string;
+  
+  constructor(message: string, code: string, suggestion?: string) {
+    super(message);
+    this.name = 'SearchError';
+    this.code = code;
+    this.suggestion = suggestion;
+  }
+}
+
+async function parseErrorResponse(res: Response): Promise<SearchError> {
+  try {
+    const data = await res.json();
+    // Check if it's a structured error (FastAPI returns { detail: {...} })
+    const detail = data.detail;
+    if (detail && typeof detail === 'object' && detail.error) {
+      return new SearchError(
+        detail.message || 'An error occurred',
+        detail.error,
+        detail.suggestion
+      );
+    }
+    // Fallback for string errors
+    const message = typeof detail === 'string' ? detail : res.statusText;
+    return new SearchError(message, 'unknown_error');
+  } catch {
+    return new SearchError(res.statusText || 'Request failed', 'request_failed');
+  }
+}
+
 function getApiBaseUrl(): string {
   const raw = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
   return (raw && raw.trim()) ? raw.trim().replace(/\/+$/, "") : "http://localhost:8000";
@@ -99,8 +138,7 @@ export async function searchByImageFile(
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Navigator /search/file failed (${res.status}): ${text || res.statusText}`);
+    throw await parseErrorResponse(res);
   }
 
   return (await res.json()) as NavigatorSearchFileResponse;
@@ -130,8 +168,7 @@ export async function searchByText(
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Navigator /search/text failed (${res.status}): ${text || res.statusText}`);
+    throw await parseErrorResponse(res);
   }
 
   return (await res.json()) as NavigatorSearchTextResponse;

@@ -707,7 +707,14 @@ def search_vector(body: SearchByVector, _: bool = Depends(require_token)):
     st = get_store()
     q = np.array(body.vector, dtype="float32")
     if q.ndim != 1:
-        raise HTTPException(status_code=400, detail="Vector must be 1-D")
+        raise HTTPException(
+            status_code=400, 
+            detail={
+                "error": "invalid_vector",
+                "message": "Vector must be 1-dimensional",
+                "suggestion": "Ensure your vector is a flat array of numbers"
+            }
+        )
     t0 = time.time()
     D, I = st.search(q, body.top_k)
     ms = int((time.time() - t0) * 1000)
@@ -719,8 +726,26 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
     Semantic text search using OpenAI embeddings.
     Searches project titles, typologies, descriptions, and metadata.
     """
-    if not body.query.strip():
-        raise HTTPException(status_code=400, detail="Query cannot be empty")
+    query = body.query.strip()
+    if not query:
+        raise HTTPException(
+            status_code=400, 
+            detail={
+                "error": "empty_query",
+                "message": "Search query cannot be empty",
+                "suggestion": "Try searching for a building type like 'museum', 'residential', or 'school'"
+            }
+        )
+    
+    if len(query) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "query_too_short",
+                "message": "Query must be at least 2 characters",
+                "suggestion": "Try a longer search term like 'arch' or 'museum'"
+            }
+        )
     
     query_id = generate_query_id()
     text_index = get_text_index_store()
@@ -730,7 +755,11 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
     if not text_index.is_ready():
         raise HTTPException(
             status_code=503, 
-            detail="Text search index not available. Run embed_text.py to generate embeddings."
+            detail={
+                "error": "index_not_ready",
+                "message": "Text search is temporarily unavailable",
+                "suggestion": "Please try again in a few moments, or use image search instead"
+            }
         )
     
     t0 = time.time()
@@ -862,7 +891,14 @@ def search_url(
         r.raise_for_status()
         pil = Image.open(BytesIO(r.content))
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch image: {e}")
+        raise HTTPException(
+            status_code=400, 
+            detail={
+                "error": "image_fetch_failed",
+                "message": f"Could not load image from URL: {str(e)[:100]}",
+                "suggestion": "Check that the URL is publicly accessible and points to a valid image (JPG, PNG)"
+            }
+        )
 
     # Optional downsample
     try:
@@ -945,7 +981,14 @@ async def search_file(
     try:
         pil = Image.open(file.file)
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid image file.")
+        raise HTTPException(
+            status_code=400, 
+            detail={
+                "error": "invalid_image",
+                "message": "The uploaded file is not a valid image",
+                "suggestion": "Please upload a JPG or PNG image file"
+            }
+        )
     # Downsample early to minimize compute on small instances
     try:
         pil = downsample_pil(pil)

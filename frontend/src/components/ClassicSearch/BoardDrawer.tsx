@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, ExternalLink, FolderOpen, Edit3, Share2 } from 'lucide-react';
+import { X, Plus, Trash2, ExternalLink, FolderOpen, Edit3, Share2, FileText, Layout } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useBoardStore, Board, ReferenceBlock } from '../../stores/boardStore';
 
@@ -14,6 +14,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
     boards,
     activeBoardId,
     createBoard,
+    createBoardWithTemplate,
     deleteBoard,
     updateBoard,
     setActiveBoard,
@@ -22,6 +23,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
   } = useBoardStore();
 
   const [isCreating, setIsCreating] = useState(false);
+  const [showTemplateChoice, setShowTemplateChoice] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -29,12 +31,16 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
   const activeBoard = boards.find((b) => b.id === activeBoardId);
   const activeReferenceBlocks = activeBoardId ? getReferenceBlocks(activeBoardId) : [];
 
-  const handleCreateBoard = () => {
-    if (newBoardName.trim()) {
-      createBoard(newBoardName.trim());
-      setNewBoardName('');
-      setIsCreating(false);
+  const handleCreateBoard = (useTemplate: boolean = false) => {
+    const name = newBoardName.trim() || (useTemplate ? 'Research Board' : 'Untitled Board');
+    if (useTemplate) {
+      createBoardWithTemplate(name);
+    } else {
+      createBoard(name);
     }
+    setNewBoardName('');
+    setIsCreating(false);
+    setShowTemplateChoice(false);
   };
 
   const handleRenameBoard = (boardId: string) => {
@@ -241,14 +247,7 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
 
             {/* Create New Board */}
             {isCreating ? (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px',
-                }}
-              >
+              <div style={{ padding: '8px' }}>
                 <input
                   type="text"
                   value={newBoardName}
@@ -256,36 +255,107 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                   placeholder="Board name..."
                   autoFocus
                   style={{
-                    flex: 1,
+                    width: '100%',
                     fontFamily: 'var(--font-secondary)',
                     fontSize: '14px',
                     padding: '10px 12px',
                     border: '1px solid rgba(0,0,0,0.15)',
                     borderRadius: '6px',
                     outline: 'none',
+                    marginBottom: '12px',
+                    boxSizing: 'border-box',
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateBoard();
+                    if (e.key === 'Enter') setShowTemplateChoice(true);
                     if (e.key === 'Escape') {
                       setIsCreating(false);
                       setNewBoardName('');
+                      setShowTemplateChoice(false);
                     }
                   }}
                 />
+                
+                {/* Template choice buttons */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => handleCreateBoard(false)}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '14px 12px',
+                      backgroundColor: 'rgba(0,0,0,0.02)',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-secondary)',
+                      transition: 'all 150ms ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+                      e.currentTarget.style.borderColor = 'rgba(0,0,0,0.2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.02)';
+                      e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)';
+                    }}
+                  >
+                    <FileText size={20} style={{ color: 'rgba(0,0,0,0.5)' }} />
+                    <span style={{ fontSize: '12px', fontWeight: 500 }}>Blank</span>
+                    <span style={{ fontSize: '10px', color: 'rgba(0,0,0,0.4)' }}>Start empty</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleCreateBoard(true)}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '14px 12px',
+                      backgroundColor: 'rgba(182, 68, 36, 0.05)',
+                      border: '1px solid var(--accent)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-secondary)',
+                      transition: 'all 150ms ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(182, 68, 36, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(182, 68, 36, 0.05)';
+                    }}
+                  >
+                    <Layout size={20} style={{ color: 'var(--accent)' }} />
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--accent)' }}>Template</span>
+                    <span style={{ fontSize: '10px', color: 'rgba(0,0,0,0.4)' }}>Narrative structure</span>
+                  </button>
+                </div>
+                
                 <button
-                  onClick={handleCreateBoard}
+                  onClick={() => {
+                    setIsCreating(false);
+                    setNewBoardName('');
+                    setShowTemplateChoice(false);
+                  }}
                   style={{
-                    fontFamily: 'var(--font-secondary)',
-                    fontSize: '12px',
-                    padding: '10px 16px',
-                    backgroundColor: 'var(--accent)',
-                    color: 'white',
+                    width: '100%',
+                    marginTop: '8px',
+                    padding: '8px',
+                    backgroundColor: 'transparent',
                     border: 'none',
                     borderRadius: '6px',
                     cursor: 'pointer',
+                    fontFamily: 'var(--font-secondary)',
+                    fontSize: '12px',
+                    color: 'rgba(0,0,0,0.4)',
                   }}
                 >
-                  Create
+                  Cancel
                 </button>
               </div>
             ) : (

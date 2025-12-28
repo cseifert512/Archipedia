@@ -90,7 +90,7 @@ interface FilterGroupProps {
   defaultExpanded?: boolean;
 }
 
-function FilterGroup({ title, options, selected, onChange, defaultExpanded = true }: FilterGroupProps) {
+function FilterGroup({ title, options, selected, onChange, defaultExpanded = false }: FilterGroupProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   
   const toggleOption = (option: string) => {
@@ -310,7 +310,6 @@ export function FilterSidebar({ filters, onFilterChange, onClearFilters }: Filte
         options={MASSING_OPTIONS}
         selected={filters.massing_type}
         onChange={(values) => updateFilter('massing_type', values)}
-        defaultExpanded={false}
       />
       
       <FilterGroup
@@ -318,7 +317,6 @@ export function FilterSidebar({ filters, onFilterChange, onClearFilters }: Filte
         options={TAG_OPTIONS}
         selected={filters.tags}
         onChange={(values) => updateFilter('tags', values)}
-        defaultExpanded={false}
       />
 
       {/* More Filters Toggle */}
