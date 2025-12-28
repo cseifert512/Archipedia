@@ -2,6 +2,25 @@
 
 This document outlines comprehensive improvements for the Archipedia search system, organized by priority and impact.
 
+---
+
+## ✅ Implementation Status (Updated: Dec 28, 2024)
+
+The following improvements have been **implemented**:
+
+| # | Improvement | Status | Implementation Details |
+|---|-------------|--------|------------------------|
+| 2 | Remove client-side filtering | ✅ **DONE** | Removed duplicate filtering from `StudyResultsPage.tsx` and `ClassicSearchPage.tsx`. Now server-only. |
+| 4 | Search result caching | ✅ **DONE** | Added TTL-based cache (1 hour) in `text_embedder.py` with max 500 entries. |
+| 8b | Short query text search | ✅ **DONE** | Hybrid search (keyword + semantic) for queries < 5 chars. Keyword fallback in `text_embedder.py`. |
+| 10 | Search history | ✅ **DONE** | localStorage-based history with dropdown UI in `ClassicSearchBar.tsx`. Persists across sessions. |
+| 16 | Better error messages | ✅ **DONE** | Structured errors with `{error, message, suggestion}` in backend. Error UI in search pages. |
+
+**Additional UI improvements:**
+- Filter sidebar now collapsed by default (`FilterSidebar.tsx`)
+
+---
+
 ## 🔴 Critical Performance Issues
 
 ### 1. **Inefficient Filtering Pipeline**
@@ -16,7 +35,7 @@ This document outlines comprehensive improvements for the Archipedia search syst
 
 **Impact**: Can reduce search latency by 30-50% when filters are active
 
-### 2. **Duplicate Filtering (Client + Server)**
+### 2. **Duplicate Filtering (Client + Server)** ✅ IMPLEMENTED
 **Current Issue**: Filters are applied both server-side and client-side, causing redundant work.
 
 **Location**: 
@@ -43,7 +62,7 @@ project_ids = self.index_store.get_project_ids_batch(indices)
 
 **Impact**: 20-30% faster for large candidate sets
 
-### 4. **No Search Result Caching**
+### 4. **No Search Result Caching** ✅ IMPLEMENTED
 **Current Issue**: Identical queries are recomputed every time
 
 **Recommendation**:
@@ -106,7 +125,7 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: More relevant results when users combine text + image queries
 
-### 8b. **Short Query Text Search Improvements**
+### 8b. **Short Query Text Search Improvements** ✅ IMPLEMENTED
 **Current Issue**: Very short queries (e.g., "arch") fail to return results due to weak semantic embeddings and lack of fallback mechanisms
 
 **Location**: `navigator/app/services/text_embedder.py:188-240`
@@ -138,7 +157,7 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: Faster query entry, reduced typos, better discovery
 
-### 10. **Search History & Recent Searches**
+### 10. **Search History & Recent Searches** ✅ IMPLEMENTED
 **Current Issue**: No way to access previous searches
 
 **Recommendation**:
@@ -217,7 +236,7 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: Enables "find similar to this image" feature
 
-### 16. **Better Error Handling & Validation**
+### 16. **Better Error Handling & Validation** ✅ IMPLEMENTED
 **Current Issue**: Limited error messages, no request validation
 
 **Recommendation**:
@@ -371,11 +390,11 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 ## 📊 Priority Matrix
 
 ### High Impact + Low Effort (Quick Wins)
-1. Remove client-side filtering (#2)
-2. Implement search result caching (#4)
-3. Better error messages (#16)
-4. Search history (#10)
-5. Short query text search improvements (#8b)
+1. ~~Remove client-side filtering (#2)~~ ✅ DONE
+2. ~~Implement search result caching (#4)~~ ✅ DONE
+3. ~~Better error messages (#16)~~ ✅ DONE
+4. ~~Search history (#10)~~ ✅ DONE
+5. ~~Short query text search improvements (#8b)~~ ✅ DONE
 
 ### High Impact + High Effort (Major Projects)
 1. Unified search pipeline (#14)
@@ -394,11 +413,12 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 ## 🚀 Implementation Roadmap
 
-### Phase 1 (1-2 weeks): Quick Wins
-- Fix duplicate filtering (#2)
-- Add search caching (#4)
-- Improve error handling (#16)
-- Add search history (#10)
+### Phase 1 (1-2 weeks): Quick Wins ✅ COMPLETE
+- ~~Fix duplicate filtering (#2)~~ ✅
+- ~~Add search caching (#4)~~ ✅
+- ~~Improve error handling (#16)~~ ✅
+- ~~Add search history (#10)~~ ✅
+- ~~Short query improvements (#8b)~~ ✅
 
 ### Phase 2 (3-4 weeks): Performance
 - Optimize filtering pipeline (#1)

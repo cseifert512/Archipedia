@@ -1,11 +1,12 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Camera, X, Upload, Link as LinkIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Camera, X, Upload, Link as LinkIcon, ChevronDown, ChevronUp, Clock, Trash2 } from 'lucide-react';
+import { getHistory, removeFromHistory, formatTimestamp, type SearchHistoryItem } from '../../lib/searchHistory';
 
 export type MatchEmphasis = 'visual' | 'balanced' | 'semantic';
 
 interface ClassicSearchBarProps {
   initialQuery?: string;
-  initialImageUrl?: string;
+  initialImageUrl?: string | null;
   onSearch: (query: string, image: File | string | null, emphasis: MatchEmphasis) => void;
   onClear: () => void;
   isSearching?: boolean;
@@ -27,8 +28,17 @@ export function ClassicSearchBar({
   const [urlInputValue, setUrlInputValue] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<SearchHistoryItem[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load history when dropdown opens
+  useEffect(() => {
+    if (showHistory) {
+      setHistory(getHistory());
+    }
+  }, [showHistory]);
 
   const hasImage = imageFile || imageUrl;
   const hasQuery = query.trim().length > 0;
@@ -106,7 +116,36 @@ export function ClassicSearchBar({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isSearching) {
       handleSearch();
+      setShowHistory(false);
     }
+    if (e.key === 'Escape') {
+      setShowHistory(false);
+    }
+  };
+
+  const handleInputFocus = () => {
+    // Show history on focus if input is empty
+    if (!query.trim()) {
+      setShowHistory(true);
+    }
+  };
+
+  const handleInputBlur = () => {
+    // Delay hiding to allow clicking history items
+    setTimeout(() => setShowHistory(false), 200);
+  };
+
+  const handleHistorySelect = (item: SearchHistoryItem) => {
+    setQuery(item.query);
+    setShowHistory(false);
+    // Trigger search with the history item
+    onSearch(item.query, imageFile || imageUrl, emphasis);
+  };
+
+  const handleRemoveHistoryItem = (e: React.MouseEvent, queryText: string) => {
+    e.stopPropagation();
+    removeFromHistory(queryText);
+    setHistory(getHistory());
   };
 
   return (
@@ -209,12 +248,20 @@ export function ClassicSearchBar({
         </div>
 
         {/* Text Input */}
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, position: 'relative' }}>
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              // Hide history when typing
+              if (e.target.value.trim()) {
+                setShowHistory(false);
+              }
+            }}
             onKeyDown={handleKeyDown}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
             placeholder="Describe what you want (e.g., 'courtyard housing in Mexico')"
             style={{
               width: '100%',
@@ -227,6 +274,104 @@ export function ClassicSearchBar({
               outline: 'none',
             }}
           />
+          
+          {/* Search History Dropdown */}
+          {showHistory && history.length > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                border: '1px solid rgba(0,0,0,0.1)',
+                zIndex: 1000,
+                marginTop: '4px',
+                maxHeight: '300px',
+                overflowY: 'auto',
+              }}
+            >
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderBottom: '1px solid rgba(0,0,0,0.05)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Clock size={12} style={{ opacity: 0.5 }} />
+                <span
+                  style={{
+                    fontFamily: 'var(--font-secondary)',
+                    fontSize: '11px',
+                    color: 'rgba(0,0,0,0.5)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Recent Searches
+                </span>
+              </div>
+              {history.map((item, index) => (
+                <div
+                  key={`${item.query}-${index}`}
+                  onClick={() => handleHistorySelect(item)}
+                  style={{
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'background 150ms ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.03)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '14px',
+                        color: '#1a1a1a',
+                      }}
+                    >
+                      {item.query || (item.hasImage ? '(Image search)' : '')}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-secondary)',
+                        fontSize: '11px',
+                        color: 'rgba(0,0,0,0.4)',
+                        marginTop: '2px',
+                      }}
+                    >
+                      {formatTimestamp(item.timestamp)}
+                      {item.resultCount !== undefined && ` · ${item.resultCount} results`}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => handleRemoveHistoryItem(e, item.query)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      borderRadius: '4px',
+                      opacity: 0.4,
+                      transition: 'opacity 150ms ease',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.4')}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           
           {/* Image options row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>

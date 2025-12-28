@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'wouter';
-import { FolderOpen, X, SortAsc } from 'lucide-react';
+import { FolderOpen, X, SortAsc, Search } from 'lucide-react';
 import {
   ClassicSearchBar,
   FilterSidebar,
@@ -14,7 +14,8 @@ import {
 import { useBoardStore } from '../stores/boardStore';
 import { mockProjects } from '../lib/mockData';
 import { toast } from 'sonner';
-import { searchByText, searchByImageFile, toAbsoluteUrl } from '../lib/navigatorApi';
+import { searchByText, searchByImageFile, toAbsoluteUrl, SearchError } from '../lib/navigatorApi';
+import { addToHistory } from '../lib/searchHistory';
 
 type SortOption = 'best' | 'visual' | 'semantic';
 
@@ -46,6 +47,7 @@ export function ClassicSearchPage() {
   const [hasSearched, setHasSearched] = useState(!!initialQuery);
   const [results, setResults] = useState<SearchResultData[]>([]);
   const [sortBy, setSortBy] = useState<SortOption>('best');
+  const [searchError, setSearchError] = useState<{ message: string; suggestion?: string } | null>(null);
 
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -105,6 +107,7 @@ export function ClassicSearchPage() {
 
       setIsSearching(true);
       setHasSearched(true);
+      setSearchError(null);
       setQuery(searchQuery);
       setUploadedImage(searchImage);
       setEmphasis(searchEmphasis);
@@ -177,30 +180,44 @@ export function ClassicSearchPage() {
         });
 
         setResults(transformedResults);
+        
+        // Record successful search to history
+        addToHistory(searchQuery, !!searchImage, transformedResults.length);
       } catch (error) {
         console.error('Search failed:', error);
-        toast.error('Search failed. Using fallback results.');
-
-        // Fallback to mock data
-        const fallbackResults: SearchResultData[] = mockProjects.slice(0, 12).map((project, index) => ({
-          project_id: project.id,
-          project_title: project.name,
-          architect: project.architect,
-          location_display: project.location,
-          year: project.yearBuilt,
-          image_id: `img_${project.id}_01`,
-          thumb_url: project.imageUrl,
-          image_url: project.imageUrl,
-          images: [{ image_id: `img_${project.id}_01`, thumb_url: project.imageUrl, image_url: project.imageUrl }],
-          score: 0.95 - index * 0.015,
-          match_reason: 'Fallback result',
-          badges: {
-            typology: [project.buildingType],
-            country: [project.location.split(',').pop()?.trim() || ''],
-            climate_bin: project.climate,
-          },
-        }));
-        setResults(fallbackResults);
+        
+        // Handle structured search errors
+        if (error instanceof SearchError) {
+          setSearchError({
+            message: error.message,
+            suggestion: error.suggestion,
+          });
+          setResults([]);
+        } else {
+          // Generic error - use fallback
+          toast.error('Search failed. Using fallback results.');
+          
+          // Fallback to mock data
+          const fallbackResults: SearchResultData[] = mockProjects.slice(0, 12).map((project, index) => ({
+            project_id: project.id,
+            project_title: project.name,
+            architect: project.architect,
+            location_display: project.location,
+            year: project.yearBuilt,
+            image_id: `img_${project.id}_01`,
+            thumb_url: project.imageUrl,
+            image_url: project.imageUrl,
+            images: [{ image_id: `img_${project.id}_01`, thumb_url: project.imageUrl, image_url: project.imageUrl }],
+            score: 0.95 - index * 0.015,
+            match_reason: 'Fallback result',
+            badges: {
+              typology: [project.buildingType],
+              country: [project.location.split(',').pop()?.trim() || ''],
+              climate_bin: project.climate,
+            },
+          }));
+          setResults(fallbackResults);
+        }
       } finally {
         setIsSearching(false);
       }
@@ -208,40 +225,9 @@ export function ClassicSearchPage() {
     []
   );
 
-  // Filter results client-side
-  const filteredResults = useMemo(() => {
-    return results.filter((result) => {
-      // Typology filter
-      if (filters.typology.length > 0) {
-        const resultTypologies = result.badges?.typology || [];
-        if (!filters.typology.some((t) => resultTypologies.includes(t))) {
-          return false;
-        }
-      }
-
-      // Country filter
-      if (filters.country.length > 0) {
-        const resultCountries = result.badges?.country || [];
-        if (!filters.country.some((c) => resultCountries.some((rc) => rc.includes(c)))) {
-          return false;
-        }
-      }
-
-      // Climate filter
-      if (filters.climate_bin.length > 0) {
-        const resultClimate = result.badges?.climate_bin || [];
-        if (!filters.climate_bin.some((c) => resultClimate.some((rc) => rc.includes(c)))) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [results, filters]);
-
-  // Sort results
+  // Sort results (filtering is done server-side to avoid duplicate work)
   const sortedResults = useMemo(() => {
-    const sorted = [...filteredResults];
+    const sorted = [...results];
     switch (sortBy) {
       case 'visual':
         // In a real implementation, would sort by visual score
@@ -253,7 +239,7 @@ export function ClassicSearchPage() {
       default:
         return sorted.sort((a, b) => b.score - a.score);
     }
-  }, [filteredResults, sortBy]);
+  }, [results, sortBy]);
 
   // Handlers
   const handleSearch = (q: string, image: File | string | null, emp: MatchEmphasis) => {
@@ -578,7 +564,74 @@ export function ClassicSearchPage() {
               ))}
             </div>
           ) : hasSearched ? (
-            sortedResults.length > 0 ? (
+            searchError ? (
+              // Error state with helpful message
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '80px 40px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                }}
+              >
+                <div
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px',
+                  }}
+                >
+                  <Search size={24} style={{ color: 'rgb(239, 68, 68)' }} />
+                </div>
+                <h3
+                  style={{
+                    fontFamily: 'var(--font-primary)',
+                    fontSize: '20px',
+                    fontWeight: 600,
+                    marginBottom: '12px',
+                    color: 'rgb(185, 28, 28)',
+                  }}
+                >
+                  {searchError.message}
+                </h3>
+                {searchError.suggestion && (
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-secondary)',
+                      fontSize: '14px',
+                      color: 'rgba(0,0,0,0.6)',
+                      marginBottom: '24px',
+                    }}
+                  >
+                    {searchError.suggestion}
+                  </p>
+                )}
+                <button
+                  onClick={() => {
+                    setSearchError(null);
+                    handleClearSearch();
+                  }}
+                  style={{
+                    fontFamily: 'var(--font-secondary)',
+                    fontSize: '14px',
+                    padding: '12px 24px',
+                    backgroundColor: '#333',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Try again
+                </button>
+              </div>
+            ) : sortedResults.length > 0 ? (
               <div
                 style={{
                   display: 'grid',

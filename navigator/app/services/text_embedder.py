@@ -5,15 +5,63 @@ Uses text-embedding-3-small (1536 dims) for efficiency.
 import os
 import json
 import hashlib
+import time
 import numpy as np
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from pathlib import Path
+from functools import lru_cache
 import logging
 
 logger = logging.getLogger(__name__)
 
 # Cache for embeddings to avoid redundant API calls
 _embedding_cache: Dict[str, np.ndarray] = {}
+
+# TTL-based cache for search results
+# Format: {cache_key: (results, timestamp)}
+_search_cache: Dict[str, Tuple[List[Dict[str, Any]], float]] = {}
+SEARCH_CACHE_TTL = 3600  # 1 hour
+SEARCH_CACHE_MAX_SIZE = 500  # Max entries to prevent memory bloat
+
+
+def _clean_search_cache():
+    """Remove expired entries from search cache."""
+    global _search_cache
+    now = time.time()
+    expired_keys = [
+        k for k, (_, ts) in _search_cache.items() 
+        if now - ts > SEARCH_CACHE_TTL
+    ]
+    for k in expired_keys:
+        del _search_cache[k]
+    
+    # If still too large, remove oldest entries
+    if len(_search_cache) > SEARCH_CACHE_MAX_SIZE:
+        sorted_items = sorted(_search_cache.items(), key=lambda x: x[1][1])
+        excess = len(_search_cache) - SEARCH_CACHE_MAX_SIZE
+        for k, _ in sorted_items[:excess]:
+            del _search_cache[k]
+
+
+def _get_search_cache(cache_key: str) -> Optional[List[Dict[str, Any]]]:
+    """Get cached search results if not expired."""
+    if cache_key in _search_cache:
+        results, timestamp = _search_cache[cache_key]
+        if time.time() - timestamp < SEARCH_CACHE_TTL:
+            logger.debug(f"Search cache hit for key {cache_key[:16]}...")
+            return results
+        else:
+            # Expired, remove it
+            del _search_cache[cache_key]
+    return None
+
+
+def _set_search_cache(cache_key: str, results: List[Dict[str, Any]]):
+    """Store search results in cache."""
+    global _search_cache
+    _clean_search_cache()
+    _search_cache[cache_key] = (results, time.time())
+    logger.debug(f"Cached search results for key {cache_key[:16]}... ({len(results)} results)")
 
 
 def get_openai_api_key() -> Optional[str]:
@@ -185,6 +233,103 @@ class TextEmbeddingIndex:
         """Check if the index is loaded and ready for search."""
         return self._embeddings is not None and len(self._project_ids) > 0
     
+    def _keyword_search(self, query: str, top_k: int) -> List[Dict[str, Any]]:
+        """
+        Fallback keyword search for short queries.
+        Searches by substring matching in titles, typologies, and searchable text.
+        
+        Args:
+            query: Search query (lowercased)
+            top_k: Number of results to return
+            
+        Returns:
+            List of matching results with scores
+        """
+        query_lower = query.lower().strip()
+        matches = []
+        
+        for i, meta in enumerate(self._metadata):
+            title = str(meta.get("title", "")).lower()
+            typology = str(meta.get("typology", "")).lower()
+            searchable = str(meta.get("searchable_text", "")).lower()
+            country = str(meta.get("country", "")).lower()
+            
+            # Check for substring matches with different weights
+            score = 0.0
+            if query_lower in title:
+                score = 0.85  # Title match is strongest
+            elif query_lower in typology:
+                score = 0.75  # Typology match is strong
+            elif query_lower in country:
+                score = 0.65  # Country match
+            elif query_lower in searchable:
+                score = 0.55  # General text match
+                
+            if score > 0:
+                result = {
+                    "idx": i,
+                    "score": score,
+                    "project_id": self._project_ids[i] if i < len(self._project_ids) else "",
+                    "match_type": "keyword",
+                }
+                result.update(meta)
+                matches.append(result)
+        
+        # Sort by score descending
+        matches.sort(key=lambda x: -x["score"])
+        return matches[:top_k]
+    
+    def _merge_results(
+        self, 
+        keyword_results: List[Dict[str, Any]], 
+        semantic_results: List[Dict[str, Any]], 
+        top_k: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Merge keyword and semantic results, deduplicating by project_id.
+        Keyword matches are boosted when they also appear in semantic results.
+        
+        Args:
+            keyword_results: Results from keyword search
+            semantic_results: Results from semantic search
+            top_k: Number of results to return
+            
+        Returns:
+            Merged and deduplicated results
+        """
+        seen_ids = set()
+        merged = []
+        
+        # First, add keyword results (they get priority for short queries)
+        for result in keyword_results:
+            pid = result.get("project_id")
+            if pid and pid not in seen_ids:
+                seen_ids.add(pid)
+                # Check if this also appears in semantic results for a boost
+                semantic_match = next(
+                    (r for r in semantic_results if r.get("project_id") == pid), 
+                    None
+                )
+                if semantic_match:
+                    # Boost score if both keyword and semantic match
+                    result["score"] = min(1.0, result["score"] + 0.1)
+                    result["match_type"] = "hybrid"
+                merged.append(result)
+        
+        # Then add semantic results that weren't already included
+        for result in semantic_results:
+            pid = result.get("project_id")
+            if pid and pid not in seen_ids:
+                seen_ids.add(pid)
+                merged.append(result)
+        
+        # Re-sort by score and assign ranks
+        merged.sort(key=lambda x: -x.get("score", 0))
+        for i, result in enumerate(merged[:top_k]):
+            result["rank"] = i + 1
+            
+        return merged[:top_k]
+
     def search(
         self,
         query: str,
@@ -193,6 +338,8 @@ class TextEmbeddingIndex:
     ) -> List[Dict[str, Any]]:
         """
         Search for projects matching the query text.
+        Uses hybrid search (keyword + semantic) for short queries to improve recall.
+        Results are cached for 1 hour to reduce API calls.
         
         Args:
             query: Natural language search query
@@ -206,11 +353,62 @@ class TextEmbeddingIndex:
             logger.warning("Text index not ready, returning empty results")
             return []
         
-        # Embed the query
+        query_stripped = query.strip()
+        query_lower = query_stripped.lower()
+        
+        # Check cache first
+        cache_key = hashlib.md5(f"{query_lower}:{top_k}:{model}".encode()).hexdigest()
+        cached = _get_search_cache(cache_key)
+        if cached is not None:
+            return cached
+        
+        # For short queries (< 5 chars or single word), use hybrid search
+        is_short_query = len(query_stripped) < 5 or len(query_stripped.split()) < 2
+        
+        if is_short_query:
+            # Get keyword results first (fast, no API call)
+            keyword_results = self._keyword_search(query_lower, top_k * 2)
+            
+            # Also get semantic results (may help for conceptual matches)
+            query_embedding = embed_text(query, model=model)
+            if query_embedding is not None:
+                semantic_results = self._semantic_search(query_embedding, top_k)
+                results = self._merge_results(keyword_results, semantic_results, top_k)
+            else:
+                # Fall back to keyword-only if embedding fails
+                for i, result in enumerate(keyword_results[:top_k]):
+                    result["rank"] = i + 1
+                results = keyword_results[:top_k]
+            
+            # Cache and return
+            _set_search_cache(cache_key, results)
+            return results
+        
+        # For longer queries, use semantic search only
         query_embedding = embed_text(query, model=model)
         if query_embedding is None:
-            return []
+            # Fallback to keyword search if embedding fails
+            keyword_results = self._keyword_search(query_lower, top_k)
+            for i, result in enumerate(keyword_results):
+                result["rank"] = i + 1
+            _set_search_cache(cache_key, keyword_results)
+            return keyword_results
         
+        results = self._semantic_search(query_embedding, top_k)
+        _set_search_cache(cache_key, results)
+        return results
+    
+    def _semantic_search(self, query_embedding: np.ndarray, top_k: int) -> List[Dict[str, Any]]:
+        """
+        Perform semantic search using precomputed embeddings.
+        
+        Args:
+            query_embedding: Query vector from embedding model
+            top_k: Number of results to return
+            
+        Returns:
+            List of matching results with scores
+        """
         # Normalize for cosine similarity
         query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-12)
         embeddings_norm = self._embeddings / (
@@ -229,6 +427,7 @@ class TextEmbeddingIndex:
                 "rank": rank,
                 "score": float(similarities[idx]),
                 "project_id": self._project_ids[idx],
+                "match_type": "semantic",
             }
             
             # Add metadata if available
