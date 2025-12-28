@@ -59,6 +59,7 @@ export type BoardBlock = ReferenceBlock | TextBlock | DividerBlock;
 // ============ Layout Types ============
 
 export type LayoutPreset = 'grid' | 'masonry' | 'slides';
+export type LayoutMode = 'grid' | 'canvas';
 export type PageFormat = 'web' | '16:9' | '4:3' | 'letter' | 'a4';
 
 // ============ Board Type ============
@@ -70,6 +71,7 @@ export interface Board {
   description?: string;
   cover_image_url?: string;
   layout_preset: LayoutPreset;
+  layout_mode: LayoutMode;
   page_format: PageFormat;
   share_token: string;
   blocks: BoardBlock[];
@@ -111,9 +113,10 @@ interface BoardState {
   lastSaved: string | null;
   
   // Board CRUD
-  createBoard: (title?: string) => Board;
+  createBoard: (title?: string, layoutMode?: LayoutMode) => Board;
+  createBoardWithTemplate: (title?: string) => Board;
   deleteBoard: (boardId: string) => void;
-  updateBoard: (boardId: string, updates: Partial<Pick<Board, 'title' | 'subtitle' | 'description' | 'cover_image_url' | 'layout_preset' | 'page_format'>>) => void;
+  updateBoard: (boardId: string, updates: Partial<Pick<Board, 'title' | 'subtitle' | 'description' | 'cover_image_url' | 'layout_preset' | 'layout_mode' | 'page_format'>>) => void;
   setActiveBoard: (boardId: string | null) => void;
   getBoardById: (boardId: string) => Board | undefined;
   getBoardByShareToken: (token: string) => Board | undefined;
@@ -158,11 +161,17 @@ const generateShareToken = () => {
 const migrateBoard = (board: Board | LegacyBoard): Board => {
   // Check if already migrated (has blocks array)
   if ('blocks' in board && Array.isArray(board.blocks)) {
-    // Ensure share_token exists
-    if (!board.share_token) {
-      return { ...board, share_token: generateShareToken() };
+    const b = board as Board;
+    // Ensure share_token and layout_mode exist
+    const needsMigration = !b.share_token || !b.layout_mode;
+    if (needsMigration) {
+      return { 
+        ...b, 
+        share_token: b.share_token || generateShareToken(),
+        layout_mode: b.layout_mode || 'grid',
+      };
     }
-    return board as Board;
+    return b;
   }
 
   // Migrate from legacy format
@@ -189,6 +198,7 @@ const migrateBoard = (board: Board | LegacyBoard): Board => {
     id: legacyBoard.id,
     title: legacyBoard.name,
     layout_preset: 'grid',
+    layout_mode: 'grid' as LayoutMode,
     page_format: 'web',
     share_token: generateShareToken(),
     blocks,
@@ -209,14 +219,136 @@ export const useBoardStore = create<BoardState>()(
 
       // ---- Board CRUD ----
 
-      createBoard: (title = 'Untitled Board') => {
+      createBoard: (title = 'Untitled Board', layoutMode: LayoutMode = 'grid') => {
         const newBoard: Board = {
           id: generateId(),
           title,
           layout_preset: 'grid',
+          layout_mode: layoutMode,
           page_format: 'web',
           share_token: generateShareToken(),
           blocks: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        set((state) => ({
+          boards: [...state.boards, newBoard],
+          activeBoardId: newBoard.id,
+          lastSaved: new Date().toISOString(),
+        }));
+        return newBoard;
+      },
+
+      createBoardWithTemplate: (title = 'Research Board') => {
+        // Create template blocks with narrative structure
+        const templateBlocks: BoardBlock[] = [
+          {
+            type: 'text',
+            id: generateId(),
+            position: 0,
+            data: {
+              style: 'h1',
+              text: 'Design Intent',
+            },
+          },
+          {
+            type: 'text',
+            id: generateId(),
+            position: 1,
+            data: {
+              style: 'body',
+              text: 'Add reference projects that exemplify the design direction...',
+            },
+          },
+          {
+            type: 'divider',
+            id: generateId(),
+            position: 2,
+            data: {
+              variant: 'space-lg',
+            },
+          },
+          {
+            type: 'text',
+            id: generateId(),
+            position: 3,
+            data: {
+              style: 'h2',
+              text: 'Spatial Strategy',
+            },
+          },
+          {
+            type: 'text',
+            id: generateId(),
+            position: 4,
+            data: {
+              style: 'body',
+              text: 'Explore how similar projects organize space and circulation...',
+            },
+          },
+          {
+            type: 'divider',
+            id: generateId(),
+            position: 5,
+            data: {
+              variant: 'space-lg',
+            },
+          },
+          {
+            type: 'text',
+            id: generateId(),
+            position: 6,
+            data: {
+              style: 'h2',
+              text: 'Material Palette',
+            },
+          },
+          {
+            type: 'text',
+            id: generateId(),
+            position: 7,
+            data: {
+              style: 'body',
+              text: 'Collect precedents that inform material and finish decisions...',
+            },
+          },
+          {
+            type: 'divider',
+            id: generateId(),
+            position: 8,
+            data: {
+              variant: 'space-lg',
+            },
+          },
+          {
+            type: 'text',
+            id: generateId(),
+            position: 9,
+            data: {
+              style: 'h2',
+              text: 'Key Takeaways',
+            },
+          },
+          {
+            type: 'text',
+            id: generateId(),
+            position: 10,
+            data: {
+              style: 'body',
+              text: 'Summarize the main insights and design principles...',
+            },
+          },
+        ];
+
+        const newBoard: Board = {
+          id: generateId(),
+          title,
+          subtitle: 'A curated collection of architectural precedents',
+          layout_preset: 'grid',
+          layout_mode: 'grid',
+          page_format: 'web',
+          share_token: generateShareToken(),
+          blocks: templateBlocks,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };

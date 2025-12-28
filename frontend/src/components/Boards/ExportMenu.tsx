@@ -1,51 +1,76 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Download, FileText, Presentation, X, Loader2, Check } from 'lucide-react';
+import { pdf } from '@react-pdf/renderer';
+import { useBoardStore } from '../../stores/boardStore';
+import { BoardPDFDocument, ExportMode, PageSize } from './export';
 
 interface ExportMenuProps {
   boardId: string;
   onClose: () => void;
 }
 
-type ExportMode = 'long' | 'slides';
-type ExportFormat = 'letter' | 'a4' | '16:9';
-
 export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
-  const [mode, setMode] = useState<ExportMode>('long');
-  const [format, setFormat] = useState<ExportFormat>('letter');
+  const [mode, setMode] = useState<ExportMode>('document');
+  const [pageSize, setPageSize] = useState<PageSize>('letter');
   const [isExporting, setIsExporting] = useState(false);
   const [exportResult, setExportResult] = useState<{
     success: boolean;
-    url?: string;
+    filename?: string;
     error?: string;
   } | null>(null);
 
-  const handleBrowserPrint = () => {
-    // Open print page in new window and trigger print dialog
-    const printUrl = `/boards/${boardId}/print?mode=${mode}&format=${mode === 'slides' ? '16:9' : format}`;
-    const printWindow = window.open(printUrl, '_blank');
-    
-    if (printWindow) {
-      setExportResult({
-        success: true,
-        url: undefined, // No download URL, using browser print
-      });
-      onClose();
-    } else {
-      setExportResult({
-        success: false,
-        error: 'Could not open print window. Please allow popups for this site.',
-      });
-    }
-  };
+  const board = useBoardStore((state) => state.getBoardById(boardId));
 
   const handleExport = async () => {
+    if (!board) {
+      setExportResult({ success: false, error: 'Board not found' });
+      return;
+    }
+
     setIsExporting(true);
     setExportResult(null);
 
-    // For now, just use browser print - it's more reliable across deployments
-    // The user can use the browser's "Save as PDF" option
-    handleBrowserPrint();
-    setIsExporting(false);
+    try {
+      // Generate the PDF document
+      const doc = (
+        <BoardPDFDocument 
+          board={board} 
+          mode={mode} 
+          pageSize={mode === 'document' ? pageSize : undefined}
+        />
+      );
+
+      // Generate blob from PDF
+      const blob = await pdf(doc).toBlob();
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const filename = `${board.title.replace(/[^a-z0-9]/gi, '_')}_${mode === 'slides' ? 'slides' : 'report'}.pdf`;
+      
+      // Trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up blob URL after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      setExportResult({
+        success: true,
+        filename,
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      setExportResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Export failed. Please try again.',
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -138,8 +163,8 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
                 icon={<FileText size={20} />}
                 label="Document"
                 description="Continuous PDF report"
-                isSelected={mode === 'long'}
-                onClick={() => setMode('long')}
+                isSelected={mode === 'document'}
+                onClick={() => setMode('document')}
               />
               <ExportTypeOption
                 icon={<Presentation size={20} />}
@@ -152,7 +177,7 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
           </div>
 
           {/* Format Selection (only for document mode) */}
-          {mode === 'long' && (
+          {mode === 'document' && (
             <div style={{ marginBottom: '24px' }}>
               <label
                 style={{
@@ -168,30 +193,61 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
                 Page Size
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                {(['letter', 'a4'] as const).map((f) => (
+                {(['letter', 'a4'] as const).map((size) => (
                   <button
-                    key={f}
-                    onClick={() => setFormat(f)}
+                    key={size}
+                    onClick={() => setPageSize(size)}
                     style={{
                       flex: 1,
                       padding: '10px 16px',
-                      backgroundColor: format === f ? 'var(--accent)' : 'rgba(0,0,0,0.04)',
-                      color: format === f ? 'white' : 'inherit',
+                      backgroundColor: pageSize === size ? 'var(--accent)' : 'rgba(0,0,0,0.04)',
+                      color: pageSize === size ? 'white' : 'inherit',
                       border: 'none',
                       borderRadius: '8px',
                       cursor: 'pointer',
                       fontFamily: 'var(--font-secondary)',
                       fontSize: '13px',
-                      fontWeight: format === f ? 500 : 400,
+                      fontWeight: pageSize === size ? 500 : 400,
                       transition: 'all 150ms',
                     }}
                   >
-                    {f === 'letter' ? 'US Letter' : 'A4'}
+                    {size === 'letter' ? 'US Letter' : 'A4'}
                   </button>
                 ))}
               </div>
             </div>
           )}
+
+          {/* Preview Info */}
+          <div
+            style={{
+              padding: '16px',
+              backgroundColor: 'rgba(0,0,0,0.02)',
+              borderRadius: '8px',
+              marginBottom: '16px',
+            }}
+          >
+            <p
+              style={{
+                fontFamily: 'var(--font-secondary)',
+                fontSize: '13px',
+                color: 'rgba(0,0,0,0.6)',
+                margin: 0,
+              }}
+            >
+              {mode === 'slides' ? (
+                <>
+                  <strong>16:9 Presentation</strong> — Each text block becomes a full slide. 
+                  Reference tiles are arranged in 2×2 grids per slide.
+                </>
+              ) : (
+                <>
+                  <strong>{pageSize === 'letter' ? 'US Letter' : 'A4'} Document</strong> — 
+                  Flowing layout with sections. Reference tiles in 3-column grids.
+                </>
+              )}
+            </p>
+          </div>
 
           {/* Export Result */}
           {exportResult && (
@@ -204,53 +260,18 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
               }}
             >
               {exportResult.success ? (
-                <div>
-                  <div
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Check size={16} style={{ color: '#22c55e' }} />
+                  <span
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: '8px',
+                      fontFamily: 'var(--font-secondary)',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      color: '#22c55e',
                     }}
                   >
-                    <Check size={16} style={{ color: '#22c55e' }} />
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-secondary)',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        color: '#22c55e',
-                      }}
-                    >
-                      {exportResult.url ? 'Export Complete' : 'Print Dialog Opened'}
-                    </span>
-                  </div>
-                  {exportResult.url ? (
-                    <a
-                      href={exportResult.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontFamily: 'var(--font-secondary)',
-                        fontSize: '13px',
-                        color: 'var(--accent)',
-                        textDecoration: 'underline',
-                      }}
-                    >
-                      Download PDF
-                    </a>
-                  ) : (
-                    <p
-                      style={{
-                        fontFamily: 'var(--font-secondary)',
-                        fontSize: '13px',
-                        color: 'rgba(0,0,0,0.6)',
-                        margin: 0,
-                      }}
-                    >
-                      Use your browser's print dialog to save as PDF.
-                    </p>
-                  )}
+                    Downloaded: {exportResult.filename}
+                  </span>
                 </div>
               ) : (
                 <p
@@ -312,18 +333,29 @@ export function ExportMenu({ boardId, onClose }: ExportMenuProps) {
           >
             {isExporting ? (
               <>
-                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                Exporting...
+                <Loader2 size={16} className="animate-spin" />
+                Generating PDF...
               </>
             ) : (
               <>
                 <Download size={16} />
-                Export PDF
+                Download PDF
               </>
             )}
           </button>
         </div>
       </div>
+
+      {/* Inline keyframes for spinner */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </>
   );
 }
@@ -391,4 +423,3 @@ function ExportTypeOption({
     </button>
   );
 }
-

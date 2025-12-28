@@ -13,7 +13,7 @@ export interface BoardDoc {
   updated_at: string;
 }
 
-interface CanvasState {
+interface TlCanvasState {
   // Document state
   boardId: string | null;
   version: number;
@@ -49,7 +49,7 @@ const AUTOSAVE_DELAY = 700;
 
 // ============ Store ============
 
-export const useCanvasStore = create<CanvasState>((set, get) => ({
+export const useTlCanvasStore = create<TlCanvasState>((set, get) => ({
   // Initial state
   boardId: null,
   version: 0,
@@ -284,3 +284,4 @@ export async function updateBoardLayoutMode(boardId: string, mode: 'grid' | 'can
     return false;
   }
 }
+
