@@ -11,6 +11,7 @@ import {
   type SearchResultData,
   type ProjectImage,
 } from '../components/ClassicSearch';
+import { HamburgerMenu } from '../components/HamburgerMenu';
 import { useBoardStore } from '../stores/boardStore';
 import { mockProjects } from '../lib/mockData';
 import { toast } from 'sonner';
@@ -412,6 +413,9 @@ export function ClassicSearchPage() {
                 </span>
               )}
             </button>
+            
+            {/* Hamburger Menu */}
+            <HamburgerMenu />
           </div>
         </div>
       </header>

@@ -16,6 +16,8 @@ import { BoardSharePage } from "./pages/BoardSharePage";
 import { BoardPrintPage } from "./pages/BoardPrintPage";
 import { StudySearchPage } from "./pages/StudySearchPage";
 import { StudyResultsPage } from "./pages/StudyResultsPage";
+import { ContactPage } from "./pages/ContactPage";
+import { SignInPage } from "./pages/SignInPage";
 import { Toaster } from "./components/ui/sonner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PasswordGate } from "./components/PasswordGate";
@@ -25,9 +27,13 @@ export default function App() {
     <ErrorBoundary>
     <div className="min-h-screen bg-white">
       <Switch>
-        <Route path="/" component={LandingPage} />
+        {/* Simple search landing page is now the default homepage */}
+        <Route path="/" component={SearchLandingPage} />
+        <Route path="/landing" component={LandingPage} />
         <Route path="/demo" component={DemoPage} />
         <Route path="/enterprise" component={EnterprisePage} />
+        <Route path="/contact" component={ContactPage} />
+        <Route path="/signin" component={SignInPage} />
         <Route path="/search" component={SearchLandingPage} />
         <Route path="/search/classic" component={ClassicSearchPage} />
         <Route path="/canvas">
@@ -49,7 +55,7 @@ export default function App() {
         <Route path="/boards/:id" component={BoardViewPage} />
         <Route path="/b/:token" component={BoardSharePage} />
         <Route>
-          <LandingPage />
+          <SearchLandingPage />
         </Route>
       </Switch>
       <Toaster />
