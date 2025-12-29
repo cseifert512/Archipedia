@@ -29,9 +29,11 @@ export default function App() {
       <Switch>
         {/* Simple search landing page is now the default homepage */}
         <Route path="/" component={SearchLandingPage} />
-        <Route path="/landing" component={LandingPage} />
+        {/* Enterprise page shows the full marketing/landing content */}
+        <Route path="/enterprise" component={LandingPage} />
         <Route path="/demo" component={DemoPage} />
-        <Route path="/enterprise" component={EnterprisePage} />
+        {/* Original enterprise page still accessible at /enterprise-details */}
+        <Route path="/enterprise-details" component={EnterprisePage} />
         <Route path="/contact" component={ContactPage} />
         <Route path="/signin" component={SignInPage} />
         <Route path="/search" component={SearchLandingPage} />
