@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Search, Sparkles, ArrowRight } from "lucide-react";
+import { HamburgerMenu } from "../components/HamburgerMenu";
 
 export function SearchLandingPage() {
   const [query, setQuery] = useState("");
@@ -53,6 +54,18 @@ export function SearchLandingPage() {
         overflow: "hidden",
       }}
     >
+      {/* Hamburger Menu in upper right */}
+      <div
+        style={{
+          position: "absolute",
+          top: "20px",
+          right: "20px",
+          zIndex: 100,
+        }}
+      >
+        <HamburgerMenu />
+      </div>
+
       {/* Subtle background pattern */}
       <div
         style={{
