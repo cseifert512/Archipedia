@@ -789,30 +789,30 @@ export function ClassicSearchPage() {
                     isSaved={isItemSaved(result.project_id)}
                   />
                 ))}
+                
+                {/* Load More Button */}
+                {hasMore && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px', gridColumn: '1 / -1' }}>
+                    <button
+                      onClick={loadMore}
+                      disabled={isLoadingMore}
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '14px',
+                        padding: '14px 40px',
+                        backgroundColor: isLoadingMore ? 'rgba(0,0,0,0.1)' : 'var(--accent)',
+                        color: isLoadingMore ? 'rgba(0,0,0,0.4)' : 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: isLoadingMore ? 'not-allowed' : 'pointer',
+                        transition: 'all 150ms ease',
+                      }}
+                    >
+                      {isLoadingMore ? 'Loading...' : `Load More (${results.length} of ${totalCount})`}
+                    </button>
+                  </div>
+                )}
               </div>
-              
-              {/* Load More Button */}
-              {hasMore && (
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
-                  <button
-                    onClick={loadMore}
-                    disabled={isLoadingMore}
-                    style={{
-                      fontFamily: 'var(--font-primary)',
-                      fontSize: '14px',
-                      padding: '14px 40px',
-                      backgroundColor: isLoadingMore ? 'rgba(0,0,0,0.1)' : 'var(--accent)',
-                      color: isLoadingMore ? 'rgba(0,0,0,0.4)' : 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: isLoadingMore ? 'not-allowed' : 'pointer',
-                      transition: 'all 150ms ease',
-                    }}
-                  >
-                    {isLoadingMore ? 'Loading...' : `Load More (${results.length} of ${totalCount})`}
-                  </button>
-                </div>
-              )}
             ) : (
               <div
                 style={{
