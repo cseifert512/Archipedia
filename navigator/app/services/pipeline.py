@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 class Pipeline:
     """Search pipeline with fusion scoring and patch reranking."""
     
+    # Exponential decay alpha for distance-to-similarity conversion
+    # Higher values = steeper decay, penalizing distant matches more
+    # Recommended range: 2.0 - 5.0
+    # Tested with test_similarity_conversion.py: alpha=2.0 gives best score differentiation
+    SIMILARITY_ALPHA = 2.0
+    
     def __init__(self, index_store: IndexStore, spatial_features: SpatialFeatures, 
                  attribute_features: AttributeFeatures, patch_features: PatchFeatures):
         self.index_store = index_store
@@ -33,12 +39,9 @@ class Pipeline:
         if not filters or (not filters.typology and not filters.climate_bin and not filters.massing_type):
             return indices, distances
         
-        # Convert indices to project IDs
-        project_ids = []
-        for idx in indices:
-            project_id = self.index_store.get_project_id(idx)
-            if project_id:
-                project_ids.append(project_id)
+        # Convert indices to project IDs using batch lookup
+        project_ids_batch = self.index_store.get_project_ids_batch(indices)
+        project_ids = [pid for pid in project_ids_batch if pid is not None]
         
         # Apply filters
         filter_dict = {}
@@ -49,14 +52,13 @@ class Pipeline:
         if filters.massing_type:
             filter_dict['massing_type'] = filters.massing_type
         
-        filtered_project_ids = self.attribute_features.apply_filters(project_ids, filter_dict)
+        filtered_project_ids = set(self.attribute_features.apply_filters(project_ids, filter_dict))
         
-        # Filter indices and distances
+        # Filter indices and distances using the already-fetched batch
         filtered_indices = []
         filtered_distances = []
         
-        for idx, distance in zip(indices, distances):
-            project_id = self.index_store.get_project_id(idx)
+        for idx, distance, project_id in zip(indices, distances, project_ids_batch):
             if project_id in filtered_project_ids:
                 filtered_indices.append(idx)
                 filtered_distances.append(distance)
@@ -88,11 +90,8 @@ class Pipeline:
         if not indices:
             return []
         
-        # Step 3: Get project IDs for candidates
-        project_ids = []
-        for idx in indices:
-            project_id = self.index_store.get_project_id(idx)
-            project_ids.append(project_id or "unknown")
+        # Step 3: Get project IDs for candidates using batch lookup
+        project_ids = [pid or "unknown" for pid in self.index_store.get_project_ids_batch(indices)]
         
         # Step 4: Compute attribute distances
         attr_distances = self.attribute_features.distances(project_ids)
@@ -103,13 +102,18 @@ class Pipeline:
         # Step 6: Normalize weights
         w_visual, w_spatial, w_attr = self.normalize_weights(weights)
         
-        # Step 7: Fusion scoring
+        # Step 7: Fusion scoring with exponential decay distance-to-similarity conversion
+        # Using exp(-alpha * distance) for better score normalization:
+        # - Produces higher similarity for close matches
+        # - Penalizes distant matches more appropriately  
+        # - Maps [0, inf) → (0, 1] naturally
+        alpha = self.SIMILARITY_ALPHA
         fused_scores = []
         for i, (v_dist, s_dist, a_dist) in enumerate(zip(visual_distances, spatial_distances, attr_distances)):
-            # Convert distances to similarities (1 - distance)
-            v_sim = 1.0 - min(v_dist, 1.0)
-            s_sim = 1.0 - min(s_dist, 1.0)
-            a_sim = 1.0 - min(a_dist, 1.0)
+            # Convert distances to similarities using exponential decay
+            v_sim = np.exp(-alpha * v_dist)
+            s_sim = np.exp(-alpha * s_dist)
+            a_sim = np.exp(-alpha * a_dist)
             
             # Weighted fusion
             fused_score = w_visual * v_sim + w_spatial * s_sim + w_attr * a_sim
@@ -117,7 +121,7 @@ class Pipeline:
         
         # Step 8: Patch rerank on top-k'
         topk_prime = min(k, 50)
-        candidate_ids = [self.index_store.get_image_id(idx) for idx in indices[:topk_prime]]
+        candidate_ids = self.index_store.get_image_ids_batch(indices[:topk_prime])
         candidate_scores = fused_scores[:topk_prime]
         
         if candidate_ids and self.patch_features:
@@ -131,7 +135,7 @@ class Pipeline:
         # Step 9: Combine reranked top-k' with remaining candidates
         remaining_indices = indices[topk_prime:]
         remaining_scores = fused_scores[topk_prime:]
-        remaining_ids = [self.index_store.get_image_id(idx) for idx in remaining_indices]
+        remaining_ids = self.index_store.get_image_ids_batch(remaining_indices)
         
         final_ids = reranked_ids + remaining_ids
         final_scores = reranked_scores + remaining_scores

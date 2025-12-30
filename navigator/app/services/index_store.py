@@ -66,17 +66,39 @@ class IndexStore:
         """Get image ID for a given index."""
         if self.idmap is None:
             return None
-        return self.idmap.get(str(index))
+        entry = self.idmap.get(str(index))
+        if entry is None:
+            return None
+        # Handle both dict format {"image_id": ..., "project_id": ...} and plain string format
+        if isinstance(entry, dict):
+            return entry.get("image_id")
+        return entry
     
     def get_project_id(self, index: int) -> Optional[str]:
-        """Get project ID for a given index (extract from image ID)."""
-        image_id = self.get_image_id(index)
+        """Get project ID for a given index."""
+        if self.idmap is None:
+            return None
+        entry = self.idmap.get(str(index))
+        if entry is None:
+            return None
+        # Handle both dict format {"image_id": ..., "project_id": ...} and plain string format
+        if isinstance(entry, dict):
+            return entry.get("project_id")
+        # Fallback: extract project_id from image_id (format: project_id_filename)
+        image_id = entry
         if image_id:
-            # Extract project_id from image_id (format: project_id_filename)
             parts = image_id.split('_', 1)
             if len(parts) >= 2:
                 return parts[0]
         return None
+    
+    def get_project_ids_batch(self, indices: List[int]) -> List[Optional[str]]:
+        """Get project IDs for multiple indices in one call."""
+        return [self.get_project_id(idx) for idx in indices]
+    
+    def get_image_ids_batch(self, indices: List[int]) -> List[Optional[str]]:
+        """Get image IDs for multiple indices in one call."""
+        return [self.get_image_id(idx) for idx in indices]
     
     def get_total_vectors(self) -> int:
         """Get total number of vectors in the index."""
