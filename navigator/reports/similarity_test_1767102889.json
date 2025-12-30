@@ -1,0 +1,38 @@
+{
+  "alpha_values": [
+    2.0,
+    3.0,
+    5.0
+  ],
+  "results_by_alpha": {
+    "2.0": {
+      "mrr": 0.0,
+      "p@5": 0.0,
+      "num_queries": 20,
+      "score_mean": 0.38710260168830607,
+      "score_std": 0.015829124949667005,
+      "score_range": 0.039390649134000255
+    },
+    "3.0": {
+      "mrr": 0.0,
+      "p@5": 0.0,
+      "num_queries": 20,
+      "score_mean": 0.3492893504277771,
+      "score_std": 0.01173169115952923,
+      "score_range": 0.02620024703408863
+    },
+    "5.0": {
+      "mrr": 0.0,
+      "p@5": 0.0,
+      "num_queries": 20,
+      "score_mean": 0.33058998542685797,
+      "score_std": 0.005090583382403664,
+      "score_range": 0.010432794657889932
+    }
+  },
+  "recommended_alpha": 2.0,
+  "best_score_range": 0.039390649134000255,
+  "num_queries": 20,
+  "k": 10,
+  "timestamp": "2025-12-30 07:54:49"
+}

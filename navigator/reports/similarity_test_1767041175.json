@@ -1,0 +1,29 @@
+{
+  "alpha_values": [
+    2.0,
+    3.0,
+    5.0
+  ],
+  "results_by_alpha": {
+    "2.0": {
+      "mrr": 0.0,
+      "p@5": 0.0,
+      "num_queries": 0
+    },
+    "3.0": {
+      "mrr": 0.0,
+      "p@5": 0.0,
+      "num_queries": 0
+    },
+    "5.0": {
+      "mrr": 0.0,
+      "p@5": 0.0,
+      "num_queries": 0
+    }
+  },
+  "best_alpha": 2.0,
+  "best_mrr": 0.0,
+  "num_queries": 20,
+  "k": 10,
+  "timestamp": "2025-12-29 14:46:15"
+}

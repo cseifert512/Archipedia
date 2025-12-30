@@ -17,6 +17,8 @@ The following improvements have been **implemented**:
 | 8b | Short query text search | ✅ **DONE** | Hybrid search (keyword + semantic) for queries < 5 chars. Keyword fallback in `text_embedder.py`. |
 | 10 | Search history | ✅ **DONE** | localStorage-based history with dropdown UI in `ClassicSearchBar.tsx`. Persists across sessions. |
 | 16 | Better error messages | ✅ **DONE** | Structured errors with `{error, message, suggestion}` in backend. Error UI in search pages. |
+| 7 | Fusion Score Normalization | ✅ **DONE** | Added `_normalize_distances()` method in `pipeline.py`. Min-max normalization applied to visual, spatial, attr distances before fusion. |
+| 15 | Search by Image ID | ✅ **DONE** | Implemented `query_image_id` support in `search.py` using `FaissStore.vector_for_image()`. |
 
 **Additional UI improvements:**
 - Filter sidebar now collapsed by default (`FilterSidebar.tsx`)
@@ -116,15 +118,21 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: More flexible and accurate search results
 
-### 7. **Fusion Score Normalization**
+### 7. **Fusion Score Normalization** ✅ IMPLEMENTED
 **Current Issue**: Visual, spatial, and attribute distances have different scales, fusion is biased
 
-**Location**: `navigator/app/main.py:326-330` (fuse_and_sort)
+**Location**: `navigator/app/services/pipeline.py:105-120`
 
 **Recommendation**:
 - Normalize each distance metric independently before fusion
 - Use quantile-based normalization to handle outliers
 - Apply min-max scaling per metric type
+
+**Implementation Details**:
+- Added `_normalize_distances()` helper method to Pipeline class
+- Applied min-max normalization to visual, spatial, and attribute distances before fusion
+- Normalization ensures all distance types are on [0, 1] scale before exponential decay conversion
+- Tested with `test_fusion_normalization.py` script confirming proper weight proportionality
 
 **Impact**: More balanced fusion, better search relevance
 
@@ -236,7 +244,7 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: Reduced code duplication, easier maintenance, consistent behavior
 
-### 15. **Implement Search by Image ID**
+### 15. **Implement Search by Image ID** ✅ IMPLEMENTED
 **Current Issue**: Feature declared but not implemented
 
 **Location**: `navigator/app/routers/search.py:44-50`
@@ -246,6 +254,12 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 - Implement image_id -> vector lookup
 - Cache embeddings for faster retrieval
 - Add endpoint: `GET /embed/{image_id}` for embedding retrieval
+
+**Implementation Details**:
+- Wired up existing `FaissStore.vector_for_image()` method in search router
+- The `/api/v2/search` endpoint now accepts `query_image_id` parameter
+- Returns 404 with descriptive error if embedding not found for image_id
+- Tested with `test_image_id_search.py` script
 
 **Impact**: Enables "find similar to this image" feature
 
@@ -417,11 +431,12 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 ### Medium Impact (Quality Improvements)
 1. ~~Improved distance normalization (#5)~~ ✅ DONE
-2. Fusion normalization (#7)
-3. Search explanations (#11)
-4. Progressive loading (#12)
-5. Query expansion (#18)
-6. Patch match heatmaps (#25)
+2. ~~Fusion normalization (#7)~~ ✅ DONE
+3. ~~Search by Image ID (#15)~~ ✅ DONE
+4. Search explanations (#11)
+5. Progressive loading (#12)
+6. Query expansion (#18)
+7. Patch match heatmaps (#25)
 
 ---
 
@@ -438,7 +453,8 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 - Optimize filtering pipeline (#1)
 - ~~Batch project ID lookups (#3)~~ ✅
 - ~~Improved distance-to-similarity conversion (#5)~~ ✅
-- Improve fusion normalization (#7)
+- ~~Improve fusion normalization (#7)~~ ✅
+- ~~Search by Image ID (#15)~~ ✅
 - Unified pipeline migration (#14)
 
 ### Phase 3 (4-6 weeks): Quality & UX

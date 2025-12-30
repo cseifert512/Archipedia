@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-12-30T08:15:37.587620",
+  "improvement": "#7 - Fusion Score Normalization",
+  "status": "COMPLETE",
+  "changes": [
+    "Added _normalize_distances() method to Pipeline class",
+    "Applied min-max normalization to visual, spatial, and attribute distances",
+    "Normalization occurs before exponential decay conversion"
+  ],
+  "benefits": [
+    "Different distance metrics are now on comparable [0, 1] scales",
+    "Weights have proportional effect on fusion scores",
+    "No single metric can dominate due to larger raw value range"
+  ]
+}

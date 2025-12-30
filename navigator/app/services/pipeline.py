@@ -34,6 +34,32 @@ class Pipeline:
         clamp = lambda x: min(max(x, 0.1), 0.7)
         return clamp(v), clamp(s), clamp(a)
     
+    def _normalize_distances(self, distances: List[float]) -> List[float]:
+        """Apply min-max normalization to a list of distances.
+        
+        Normalizes distances to [0, 1] range so that different distance metrics
+        (visual, spatial, attribute) are on comparable scales before fusion.
+        
+        Args:
+            distances: List of raw distance values
+            
+        Returns:
+            List of normalized distances in [0, 1] range
+        """
+        if not distances:
+            return distances
+        
+        arr = np.array(distances, dtype=np.float32)
+        d_min = arr.min()
+        d_max = arr.max()
+        
+        # Avoid division by zero when all distances are the same
+        if d_max - d_min < 1e-12:
+            return [0.0] * len(distances)
+        
+        normalized = (arr - d_min) / (d_max - d_min)
+        return normalized.tolist()
+    
     def _apply_filters(self, indices: List[int], distances: List[float], filters: Filters) -> Tuple[List[int], List[float]]:
         """Apply attribute filters to candidates."""
         if not filters or (not filters.typology and not filters.climate_bin and not filters.massing_type):
@@ -102,6 +128,13 @@ class Pipeline:
         # Step 6: Normalize weights
         w_visual, w_spatial, w_attr = self.normalize_weights(weights)
         
+        # Step 6.5: Normalize distances (min-max) so different metrics are on comparable scales
+        # This prevents metrics with larger ranges (e.g., visual: 0-2+) from dominating
+        # metrics with smaller ranges (e.g., attr: 0-1)
+        visual_distances_norm = self._normalize_distances(visual_distances)
+        spatial_distances_norm = self._normalize_distances(spatial_distances)
+        attr_distances_norm = self._normalize_distances(attr_distances)
+        
         # Step 7: Fusion scoring with exponential decay distance-to-similarity conversion
         # Using exp(-alpha * distance) for better score normalization:
         # - Produces higher similarity for close matches
@@ -109,8 +142,8 @@ class Pipeline:
         # - Maps [0, inf) → (0, 1] naturally
         alpha = self.SIMILARITY_ALPHA
         fused_scores = []
-        for i, (v_dist, s_dist, a_dist) in enumerate(zip(visual_distances, spatial_distances, attr_distances)):
-            # Convert distances to similarities using exponential decay
+        for i, (v_dist, s_dist, a_dist) in enumerate(zip(visual_distances_norm, spatial_distances_norm, attr_distances_norm)):
+            # Convert normalized distances to similarities using exponential decay
             v_sim = np.exp(-alpha * v_dist)
             s_sim = np.exp(-alpha * s_dist)
             a_sim = np.exp(-alpha * a_dist)

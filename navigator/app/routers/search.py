@@ -6,6 +6,7 @@ import logging
 from ..models import SearchRequest, SearchResponse, SearchResult, WhyBlock, Feedback, EmbedResponse
 from ..services.embedder import get_embedder
 from ..services.pipeline import Pipeline
+from ..faiss_service import FaissStore
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -42,12 +43,15 @@ async def search(request: SearchRequest):
         
         # Get query vector
         if request.query_image_id:
-            # Load embedding for existing image
-            # This would need to be implemented based on your storage
-            raise HTTPException(
-                status_code=501,
-                detail="Search by image_id not yet implemented"
-            )
+            # Load embedding for existing image using FaissStore
+            try:
+                store = FaissStore(settings.data_dir)
+                query_vector = store.vector_for_image(request.query_image_id)
+            except FileNotFoundError:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Embedding not found for image_id: {request.query_image_id}"
+                )
         else:
             # Use provided vector
             query_vector = np.array(request.query_vector, dtype=np.float32)
