@@ -63,12 +63,51 @@ export function ClassicSearchBar({
     if (file) handleFileSelect(file);
   };
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  // Fetch an image from URL and convert to File for search
+  const fetchAndSetImage = useCallback(async (url: string, imageName?: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch image');
+      const blob = await response.blob();
+      const filename = imageName ? `${imageName}.jpg` : 'dropped-image.jpg';
+      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+      handleFileSelect(file);
+    } catch (error) {
+      console.error('Failed to fetch image from URL:', error);
+      // Fallback: just use the URL directly
+      setImageUrl(url);
+      setImageFile(null);
+      setImagePreview(url);
+    }
+  }, [handleFileSelect]);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    
+    // Check for internal image drag (from result cards)
+    const imageData = e.dataTransfer.getData('application/x-archipedia-image');
+    if (imageData) {
+      try {
+        const { url, image_id } = JSON.parse(imageData);
+        await fetchAndSetImage(url, image_id);
+        return;
+      } catch (err) {
+        console.error('Failed to parse dropped image data:', err);
+      }
+    }
+    
+    // Check for URL drag (text/uri-list)
+    const urlData = e.dataTransfer.getData('text/uri-list');
+    if (urlData && urlData.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i)) {
+      await fetchAndSetImage(urlData);
+      return;
+    }
+    
+    // Existing file drop logic
     const file = e.dataTransfer.files?.[0];
     if (file) handleFileSelect(file);
-  }, [handleFileSelect]);
+  }, [handleFileSelect, fetchAndSetImage]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();

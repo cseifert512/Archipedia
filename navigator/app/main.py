@@ -1142,6 +1142,218 @@ async def search_file(
         "debug": {**debug_info, "fusion_latency_ms": fusion_ms}
     }
 
+# ---- Hybrid Search Endpoint ----
+
+@app.post("/search/hybrid")
+async def search_hybrid(
+    file: Optional[UploadFile] = File(None),
+    image_id: Optional[str] = Query(None, description="Image ID to use as visual query (alternative to file upload)"),
+    query: Optional[str] = Query(None, description="Text query for semantic search"),
+    top_k: int = Query(12, description="Number of results to return"),
+    w_visual: float = Query(0.5, ge=0.0, le=1.0, description="Weight for visual search results"),
+    w_text: float = Query(0.5, ge=0.0, le=1.0, description="Weight for text search results"),
+    _: bool = Depends(require_token),
+):
+    """
+    Hybrid search combining visual (image) and semantic (text) search.
+    
+    Accepts either an image file or image_id for visual search, plus optional text query.
+    When both visual and text inputs are provided, results are fused using weighted scoring.
+    
+    The fusion works by:
+    1. Running visual search (if image provided)
+    2. Running text search (if query provided)
+    3. Merging results with weighted scores from each search type
+    4. Deduplicating by project_id, keeping highest combined score
+    """
+    import time
+    t0 = time.time()
+    
+    st = get_store()
+    text_index = get_text_index_store()
+    
+    visual_embedding = None
+    visual_results = []
+    text_results = []
+    
+    # Get visual embedding from file or image_id
+    if file is not None:
+        try:
+            pil = Image.open(file.file)
+            pil = downsample_pil(pil)
+            visual_embedding = embed_pil(pil)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_image",
+                    "message": "The uploaded file is not a valid image",
+                    "suggestion": "Please upload a JPG or PNG image file"
+                }
+            )
+    elif image_id:
+        try:
+            visual_embedding = st.vector_for_image(image_id)
+        except FileNotFoundError:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "embedding_not_found",
+                    "message": f"No embedding found for image_id: {image_id}",
+                    "suggestion": "Check the image_id and try again"
+                }
+            )
+    
+    # Perform visual search if we have an embedding
+    if visual_embedding is not None:
+        # Search for more results to allow for merging
+        search_k = max(top_k * 3, 50)
+        D, I = st.search(visual_embedding, search_k)
+        visual_results = st.results_payload(D, I)
+        
+        # Convert distance to similarity score (normalize to 0-1)
+        for result in visual_results:
+            dist = result.get("distance", 0)
+            # Using exponential decay for distance-to-similarity
+            result["visual_score"] = float(np.exp(-2.0 * dist))
+    
+    # Perform text search if we have a query
+    if query and query.strip():
+        if text_index.is_ready():
+            search_k = max(top_k * 3, 50)
+            text_results = text_index.search(query.strip(), top_k=search_k)
+            
+            # Text results already have a score from cosine similarity
+            for result in text_results:
+                result["text_score"] = result.get("score", 0)
+    
+    # Merge results
+    merged = {}
+    
+    # Process visual results
+    for result in visual_results:
+        pid = result.get("project_id")
+        if not pid:
+            continue
+        
+        if pid not in merged:
+            merged[pid] = {
+                "project_id": pid,
+                "visual_score": 0.0,
+                "text_score": 0.0,
+                "visual_data": None,
+                "text_data": None,
+            }
+        
+        # Keep the best visual result for this project
+        if result.get("visual_score", 0) > merged[pid].get("visual_score", 0):
+            merged[pid]["visual_score"] = result.get("visual_score", 0)
+            merged[pid]["visual_data"] = result
+    
+    # Process text results
+    for result in text_results:
+        pid = result.get("project_id")
+        if not pid:
+            continue
+        
+        if pid not in merged:
+            merged[pid] = {
+                "project_id": pid,
+                "visual_score": 0.0,
+                "text_score": 0.0,
+                "visual_data": None,
+                "text_data": None,
+            }
+        
+        # Keep the best text result for this project
+        if result.get("text_score", 0) > merged[pid].get("text_score", 0):
+            merged[pid]["text_score"] = result.get("text_score", 0)
+            merged[pid]["text_data"] = result
+    
+    # Calculate combined scores and build final results
+    final_results = []
+    
+    # Normalize weights to sum to 1
+    total_weight = max(w_visual + w_text, 0.001)
+    norm_w_visual = w_visual / total_weight
+    norm_w_text = w_text / total_weight
+    
+    for pid, data in merged.items():
+        combined_score = (
+            norm_w_visual * data["visual_score"] + 
+            norm_w_text * data["text_score"]
+        )
+        
+        # Start with visual data if available, else text data
+        result = {}
+        if data["visual_data"]:
+            result = {**data["visual_data"]}
+        elif data["text_data"]:
+            # Text results need thumb_url hydration
+            result = {
+                "project_id": pid,
+                "title": data["text_data"].get("title"),
+                "typology": data["text_data"].get("typology"),
+                "country": data["text_data"].get("country"),
+                "climate_bin": data["text_data"].get("climate_bin"),
+            }
+            # Try to get thumbnail
+            thumb = st.thumb_for_project(pid)
+            if thumb:
+                result["thumb_url"] = thumb
+        
+        result["combined_score"] = float(combined_score)
+        result["visual_score"] = float(data["visual_score"])
+        result["text_score"] = float(data["text_score"])
+        result["match_reason"] = _get_hybrid_match_reason(data["visual_score"], data["text_score"])
+        
+        final_results.append(result)
+    
+    # Sort by combined score and take top_k
+    final_results.sort(key=lambda x: -x["combined_score"])
+    final_results = final_results[:top_k]
+    
+    # Assign ranks
+    for i, result in enumerate(final_results, start=1):
+        result["rank"] = i
+        # Use combined_score as the primary score for consistency
+        result["score"] = result["combined_score"]
+    
+    ms = int((time.time() - t0) * 1000)
+    query_id = generate_query_id()
+    
+    return {
+        "query_id": query_id,
+        "latency_ms": ms,
+        "weights": {
+            "visual": w_visual,
+            "text": w_text,
+            "visual_normalized": norm_w_visual,
+            "text_normalized": norm_w_text,
+        },
+        "has_visual": visual_embedding is not None,
+        "has_text": bool(query and query.strip()),
+        "results": final_results,
+    }
+
+
+def _get_hybrid_match_reason(visual_score: float, text_score: float) -> str:
+    """Generate a human-readable match reason based on which search contributed more."""
+    if visual_score > 0 and text_score > 0:
+        if visual_score > text_score * 1.5:
+            return "Strong visual match with text relevance"
+        elif text_score > visual_score * 1.5:
+            return "Strong semantic match with visual similarity"
+        else:
+            return "Balanced visual and semantic match"
+    elif visual_score > 0:
+        return "Similar visual style"
+    elif text_score > 0:
+        return "Matching description"
+    else:
+        return "General match"
+
+
 # ---- Study-specific upload endpoints ----
 
 def _validate_size(content: bytes):

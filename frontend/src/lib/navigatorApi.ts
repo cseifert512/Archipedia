@@ -250,4 +250,80 @@ export function getThumbnailUrl(imageId: string): string {
   return getImageUrl(imageId);
 }
 
+// Hybrid search response interface
+export interface NavigatorHybridSearchResult extends NavigatorSearchResult {
+  combined_score?: number;
+  visual_score?: number;
+  text_score?: number;
+  match_reason?: string;
+}
+
+export interface NavigatorHybridSearchResponse {
+  query_id?: string;
+  latency_ms?: number;
+  weights?: {
+    visual: number;
+    text: number;
+    visual_normalized: number;
+    text_normalized: number;
+  };
+  has_visual?: boolean;
+  has_text?: boolean;
+  results: NavigatorHybridSearchResult[];
+}
+
+/**
+ * Hybrid search combining visual (image) and semantic (text) search.
+ * 
+ * @param options Search options
+ * @param options.file - Image file for visual search
+ * @param options.imageId - Alternative to file: use existing image embedding
+ * @param options.query - Text query for semantic search
+ * @param options.topK - Number of results to return (default: 12)
+ * @param options.wVisual - Weight for visual results (0-1, default: 0.5)
+ * @param options.wText - Weight for text results (0-1, default: 0.5)
+ * @returns Promise with search results
+ */
+export async function searchHybrid(options: {
+  file?: File;
+  imageId?: string;
+  query?: string;
+  topK?: number;
+  wVisual?: number;
+  wText?: number;
+}): Promise<NavigatorHybridSearchResponse> {
+  const base = getApiBaseUrl();
+  
+  const params = new URLSearchParams();
+  params.set("top_k", String(options.topK ?? 12));
+  params.set("w_visual", String(options.wVisual ?? 0.5));
+  params.set("w_text", String(options.wText ?? 0.5));
+  
+  if (options.imageId) {
+    params.set("image_id", options.imageId);
+  }
+  if (options.query) {
+    params.set("query", options.query);
+  }
+  
+  const form = new FormData();
+  if (options.file) {
+    form.append("file", options.file);
+  }
+  
+  const res = await fetch(`${base}/search/hybrid?${params.toString()}`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeader(),
+    },
+    body: options.file ? form : undefined,
+  });
+  
+  if (!res.ok) {
+    throw await parseErrorResponse(res);
+  }
+  
+  return (await res.json()) as NavigatorHybridSearchResponse;
+}
+
 

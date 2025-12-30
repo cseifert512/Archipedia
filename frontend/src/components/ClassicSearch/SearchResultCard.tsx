@@ -107,6 +107,18 @@ export function SearchResultCard({
           <img
             src={currentImage.thumb_url || currentImage.image_url}
             alt={result.project_title}
+            draggable
+            onDragStart={(e) => {
+              // Set custom data for internal drag-and-drop to search bar
+              e.dataTransfer.setData('text/uri-list', currentImage.thumb_url || currentImage.image_url);
+              e.dataTransfer.setData('application/x-archipedia-image', JSON.stringify({
+                url: currentImage.thumb_url || currentImage.image_url,
+                image_id: currentImage.image_id,
+                project_id: result.project_id,
+                project_title: result.project_title
+              }));
+              e.dataTransfer.effectAllowed = 'copy';
+            }}
             style={{
               position: 'absolute',
               top: 0,
@@ -116,6 +128,7 @@ export function SearchResultCard({
               objectFit: 'cover',
               transition: 'transform 300ms ease',
               transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+              cursor: 'grab',
             }}
             onError={() => setImageError(true)}
           />

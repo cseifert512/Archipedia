@@ -15,7 +15,7 @@ import { HamburgerMenu } from '../components/HamburgerMenu';
 import { useBoardStore } from '../stores/boardStore';
 import { mockProjects } from '../lib/mockData';
 import { toast } from 'sonner';
-import { searchByText, searchByImageFile, toAbsoluteUrl, SearchError } from '../lib/navigatorApi';
+import { searchByText, searchByImageFile, searchHybrid, toAbsoluteUrl, SearchError } from '../lib/navigatorApi';
 import { addToHistory } from '../lib/searchHistory';
 
 type SortOption = 'best' | 'visual' | 'semantic';
@@ -117,16 +117,31 @@ export function ClassicSearchPage() {
         let apiResults: any[] = [];
 
         // Decide which API to call based on input type
-        if (searchImage && searchImage instanceof File) {
-          // Image search
-          const response = await searchByImageFile(searchImage, {
+        const hasImage = searchImage && searchImage instanceof File;
+        const hasText = searchQuery.trim().length > 0;
+        
+        if (hasImage && hasText) {
+          // Hybrid search: both image and text
+          const wVisual = searchEmphasis === 'visual' ? 0.7 : searchEmphasis === 'semantic' ? 0.3 : 0.5;
+          const wText = 1.0 - wVisual;
+          const response = await searchHybrid({
+            file: searchImage as File,
+            query: searchQuery.trim(),
+            topK: 50,
+            wVisual,
+            wText,
+          });
+          apiResults = response.results || [];
+        } else if (hasImage) {
+          // Image-only search
+          const response = await searchByImageFile(searchImage as File, {
             topK: 50,
             wVisual: searchEmphasis === 'visual' ? 1.0 : 0.5,
             wAttr: searchEmphasis === 'semantic' ? 0.5 : 0.25,
           });
           apiResults = response.results || [];
-        } else if (searchQuery.trim()) {
-          // Text search
+        } else if (hasText) {
+          // Text-only search
           const response = await searchByText(searchQuery, { topK: 50 });
           apiResults = response.results || [];
         }
@@ -166,12 +181,13 @@ export function ClassicSearchPage() {
             image_url: projectImages[0]?.image_url || thumbUrl,
             images: projectImages,
             score: score,
-            match_reason:
+            match_reason: result.match_reason || (
               searchEmphasis === 'visual'
                 ? 'Visual similarity'
                 : searchEmphasis === 'semantic'
                 ? 'Semantic match'
-                : 'Balanced match',
+                : 'Balanced match'
+            ),
             badges: {
               typology: result.typology ? [result.typology] : [],
               country: result.country ? [result.country] : [],

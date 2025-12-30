@@ -21,6 +21,7 @@ The following improvements have been **implemented**:
 | 15 | Search by Image ID | ✅ **DONE** | Implemented `query_image_id` support in `search.py` using `FaissStore.vector_for_image()`. |
 | 6 | Better Weight Normalization | ✅ **DONE** | Widened clamp range from [0.1, 0.7] to [0.0, 0.95]. Added `strict` mode for backward compatibility. |
 | 11 | Search Result Explanations | ✅ **DONE** | Enhanced `get_explanation()` with human-readable `match_reason`. Updated `MatchReasonBadge` tooltip. |
+| 8 | Hybrid Search (Text + Image) | ✅ **DONE** | New `/search/hybrid` endpoint combines visual and text search with weighted fusion. Drag-and-drop from results to search bar. |
 
 **Additional UI improvements:**
 - Filter sidebar now collapsed by default (`FilterSidebar.tsx`)
@@ -145,13 +146,22 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: More balanced fusion, better search relevance
 
-### 8. **Hybrid Text + Visual Search**
+### 8. **Hybrid Text + Visual Search** ✅ IMPLEMENTED
 **Current Issue**: Text and image search are separate, no cross-modal fusion
 
 **Recommendation**:
 - Implement hybrid search that combines text embeddings with visual embeddings
 - Use weighted combination of text and visual search results
 - Cross-modal reranking: reorder visual results using text similarity
+
+**Implementation Details**:
+- Created `/search/hybrid` endpoint in `main.py` that accepts both image (file or image_id) and text query
+- Results are merged by project_id with weighted scores: `combined_score = w_visual * visual_score + w_text * text_score`
+- Added `searchHybrid()` function in `navigatorApi.ts` 
+- Updated `ClassicSearchPage.tsx` and `StudyResultsPage.tsx` to use hybrid search when both image and text are provided
+- Added drag-and-drop support: users can drag result card images to the search bar to use as visual reference
+- `SearchResultCard.tsx` images are now draggable with custom data transfer
+- `ClassicSearchBar.tsx` accepts URL drops and converts them to File objects
 
 **Impact**: More relevant results when users combine text + image queries
 
