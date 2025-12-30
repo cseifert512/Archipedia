@@ -4,14 +4,16 @@ This document outlines comprehensive improvements for the Archipedia search syst
 
 ---
 
-## ✅ Implementation Status (Updated: Dec 28, 2024)
+## ✅ Implementation Status (Updated: Dec 30, 2024)
 
 The following improvements have been **implemented**:
 
 | # | Improvement | Status | Implementation Details |
 |---|-------------|--------|------------------------|
 | 2 | Remove client-side filtering | ✅ **DONE** | Removed duplicate filtering from `StudyResultsPage.tsx` and `ClassicSearchPage.tsx`. Now server-only. |
+| 3 | Batch Project ID Lookups | ✅ **DONE** | Added `get_project_ids_batch` and `get_image_ids_batch` methods to `index_store.py`. Updated `pipeline.py` to use batch lookups. |
 | 4 | Search result caching | ✅ **DONE** | Added TTL-based cache (1 hour) in `text_embedder.py` with max 500 entries. |
+| 5 | Improved Distance-to-Similarity Conversion | ✅ **DONE** | Replaced `1 - distance` with exponential decay `np.exp(-alpha * dist)` in `pipeline.py`. Alpha=2.0 based on testing. |
 | 8b | Short query text search | ✅ **DONE** | Hybrid search (keyword + semantic) for queries < 5 chars. Keyword fallback in `text_embedder.py`. |
 | 10 | Search history | ✅ **DONE** | localStorage-based history with dropdown UI in `ClassicSearchBar.tsx`. Persists across sessions. |
 | 16 | Better error messages | ✅ **DONE** | Structured errors with `{error, message, suggestion}` in backend. Error UI in search pages. |
@@ -49,7 +51,7 @@ The following improvements have been **implemented**:
 
 **Impact**: Reduces frontend computation and ensures consistent results
 
-### 3. **Sequential Project ID Lookups**
+### 3. **Sequential Project ID Lookups** ✅ IMPLEMENTED
 **Current Issue**: Multiple sequential lookups in pipeline.search() method
 
 **Location**: `navigator/app/services/pipeline.py:91-95`
@@ -59,6 +61,11 @@ The following improvements have been **implemented**:
 # Batch lookup instead of loop
 project_ids = self.index_store.get_project_ids_batch(indices)
 ```
+
+**Implementation Details**:
+- Added `get_project_ids_batch()` and `get_image_ids_batch()` methods to `index_store.py`
+- Updated `pipeline.py` to use batch lookups in `_apply_filters()` and `search()` methods
+- Fixes also resolved issues with dictionary-based `id_map.json` entries
 
 **Impact**: 20-30% faster for large candidate sets
 
@@ -77,7 +84,7 @@ project_ids = self.index_store.get_project_ids_batch(indices)
 
 ## 🟠 Search Quality Improvements
 
-### 5. **Improved Distance-to-Similarity Conversion**
+### 5. **Improved Distance-to-Similarity Conversion** ✅ IMPLEMENTED
 **Current Issue**: Simple `1 - distance` conversion doesn't account for distance distribution
 
 **Location**: `navigator/app/services/pipeline.py:109-112`
@@ -88,6 +95,12 @@ project_ids = self.index_store.get_project_ids_batch(indices)
 v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 # Calibrate alpha based on distance distribution statistics
 ```
+
+**Implementation Details**:
+- Added `SIMILARITY_ALPHA = 2.0` class constant in `pipeline.py`
+- Replaced `1.0 - min(dist, 1.0)` with `np.exp(-alpha * dist)` for all similarity conversions
+- Alpha value calibrated through testing with `test_similarity_conversion.py` script
+- Alpha=2.0 provides better score differentiation than higher values
 
 **Impact**: Better score normalization, improved relevance
 
@@ -403,11 +416,12 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 4. Search autocomplete (#9)
 
 ### Medium Impact (Quality Improvements)
-1. Improved distance normalization (#5, #7)
-2. Search explanations (#11)
-3. Progressive loading (#12)
-4. Query expansion (#18)
-5. Patch match heatmaps (#25)
+1. ~~Improved distance normalization (#5)~~ ✅ DONE
+2. Fusion normalization (#7)
+3. Search explanations (#11)
+4. Progressive loading (#12)
+5. Query expansion (#18)
+6. Patch match heatmaps (#25)
 
 ---
 
@@ -422,7 +436,8 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 ### Phase 2 (3-4 weeks): Performance
 - Optimize filtering pipeline (#1)
-- Batch project ID lookups (#3)
+- ~~Batch project ID lookups (#3)~~ ✅
+- ~~Improved distance-to-similarity conversion (#5)~~ ✅
 - Improve fusion normalization (#7)
 - Unified pipeline migration (#14)
 
