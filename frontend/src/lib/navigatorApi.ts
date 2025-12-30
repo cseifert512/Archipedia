@@ -23,6 +23,11 @@ export interface NavigatorSearchFileResponse {
   filters?: Record<string, any>;
   results: NavigatorSearchResult[];
   debug?: Record<string, any>;
+  // Pagination
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
+  total_count?: number;
 }
 
 export interface NavigatorTextSearchResult {
@@ -42,6 +47,11 @@ export interface NavigatorSearchTextResponse {
   query?: string;
   results: NavigatorTextSearchResult[];
   debug?: Record<string, any>;
+  // Pagination
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
+  total_count?: number;
 }
 
 // Structured error from API
@@ -106,6 +116,8 @@ export async function searchByImageFile(
   file: File,
   options?: {
     topK?: number;
+    page?: number;
+    pageSize?: number;
     wVisual?: number;
     wAttr?: number;
     wSpatial?: number;
@@ -114,6 +126,8 @@ export async function searchByImageFile(
 ): Promise<NavigatorSearchFileResponse> {
   const base = getApiBaseUrl();
   const topK = options?.topK ?? 12;
+  const page = options?.page ?? 1;
+  const pageSize = options?.pageSize ?? 12;
   const wVisual = options?.wVisual ?? 1.0;
   const wAttr = options?.wAttr ?? 0.0;
   const wSpatial = options?.wSpatial ?? 0.0;
@@ -121,6 +135,8 @@ export async function searchByImageFile(
 
   const params = new URLSearchParams();
   params.set("top_k", String(topK));
+  params.set("page", String(page));
+  params.set("page_size", String(pageSize));
   params.set("w_visual", String(wVisual));
   params.set("w_attr", String(wAttr));
   params.set("w_spatial", String(wSpatial));
@@ -146,15 +162,26 @@ export async function searchByImageFile(
 
 export async function searchByText(
   query: string,
-  options?: { topK?: number; country?: string; typology?: string; climateBin?: string }
+  options?: { 
+    topK?: number; 
+    page?: number;
+    pageSize?: number;
+    country?: string; 
+    typology?: string; 
+    climateBin?: string 
+  }
 ): Promise<NavigatorSearchTextResponse> {
   const base = getApiBaseUrl();
   const q = (query || "").trim();
   const topK = options?.topK ?? 25;
+  const page = options?.page ?? 1;
+  const pageSize = options?.pageSize ?? 12;
 
   const params = new URLSearchParams();
   params.set("q", q);
   params.set("top_k", String(topK));
+  params.set("page", String(page));
+  params.set("page_size", String(pageSize));
   if (options?.country) params.set("country", options.country);
   if (options?.typology) params.set("typology", options.typology);
   if (options?.climateBin) params.set("climate_bin", options.climateBin);
@@ -270,6 +297,11 @@ export interface NavigatorHybridSearchResponse {
   has_visual?: boolean;
   has_text?: boolean;
   results: NavigatorHybridSearchResult[];
+  // Pagination
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
+  total_count?: number;
 }
 
 /**
@@ -280,6 +312,8 @@ export interface NavigatorHybridSearchResponse {
  * @param options.imageId - Alternative to file: use existing image embedding
  * @param options.query - Text query for semantic search
  * @param options.topK - Number of results to return (default: 12)
+ * @param options.page - Page number (1-indexed, default: 1)
+ * @param options.pageSize - Results per page (default: 12)
  * @param options.wVisual - Weight for visual results (0-1, default: 0.5)
  * @param options.wText - Weight for text results (0-1, default: 0.5)
  * @returns Promise with search results
@@ -289,6 +323,8 @@ export async function searchHybrid(options: {
   imageId?: string;
   query?: string;
   topK?: number;
+  page?: number;
+  pageSize?: number;
   wVisual?: number;
   wText?: number;
 }): Promise<NavigatorHybridSearchResponse> {
@@ -296,6 +332,8 @@ export async function searchHybrid(options: {
   
   const params = new URLSearchParams();
   params.set("top_k", String(options.topK ?? 12));
+  params.set("page", String(options.page ?? 1));
+  params.set("page_size", String(options.pageSize ?? 12));
   params.set("w_visual", String(options.wVisual ?? 0.5));
   params.set("w_text", String(options.wText ?? 0.5));
   
@@ -324,6 +362,56 @@ export async function searchHybrid(options: {
   }
   
   return (await res.json()) as NavigatorHybridSearchResponse;
+}
+
+// ---- Autocomplete ----
+
+export interface AutocompleteSuggestion {
+  type: 'title' | 'typology' | 'architect' | 'city' | 'tag';
+  value: string;
+}
+
+export interface AutocompleteResponse {
+  query: string;
+  suggestions: AutocompleteSuggestion[];
+}
+
+/**
+ * Get autocomplete suggestions for search queries.
+ * 
+ * @param query - The search query prefix
+ * @param limit - Maximum number of suggestions (default: 8)
+ * @returns Promise with autocomplete suggestions
+ */
+export async function getAutocomplete(
+  query: string,
+  limit: number = 8
+): Promise<AutocompleteSuggestion[]> {
+  const base = getApiBaseUrl();
+  const q = (query || "").trim();
+  
+  if (q.length < 1) {
+    return [];
+  }
+  
+  const params = new URLSearchParams();
+  params.set("q", q);
+  params.set("limit", String(limit));
+  
+  const res = await fetch(`${base}/autocomplete?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      ...getAuthHeader(),
+    },
+  });
+  
+  if (!res.ok) {
+    console.error("Autocomplete failed:", res.statusText);
+    return [];
+  }
+  
+  const data = (await res.json()) as AutocompleteResponse;
+  return data.suggestions || [];
 }
 
 

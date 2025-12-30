@@ -263,6 +263,8 @@ class SearchByVector(BaseModel):
 class SearchByText(BaseModel):
     query: str
     top_k: int = 12
+    page: int = 1
+    page_size: int = 12
     filters: Filters = Filters()
     strict: bool = False
 
@@ -387,6 +389,108 @@ def fuse_and_sort(results: List[dict], D: np.ndarray, weights: Weights, filters:
 def healthz():
     # Lightweight health check; avoid loading heavy subsystems
     return {"ok": True}
+
+
+# ---- Autocomplete Index ----
+_autocomplete_index: Optional[dict] = None
+
+def get_autocomplete_index() -> dict:
+    """Build or retrieve the in-memory autocomplete index from projects.csv."""
+    global _autocomplete_index
+    if _autocomplete_index is not None:
+        return _autocomplete_index
+    
+    try:
+        st = get_store()
+        df = st._projects
+        if df is None or df.empty:
+            _autocomplete_index = {"titles": [], "typologies": [], "architects": [], "cities": [], "tags": []}
+            return _autocomplete_index
+        
+        # Extract unique values, filtering out "unknown" and empty strings
+        titles = [t for t in df["title"].dropna().unique() if t and t.lower() != "unknown"]
+        typologies = [t for t in df["typology"].dropna().unique() if t and t.lower() != "unknown"]
+        architects = [a for a in df["architect"].dropna().unique() if a and a.lower() != "unknown"]
+        cities = [c for c in df["city"].dropna().unique() if c and c.lower() != "unknown"]
+        
+        # Extract tags (pipe-separated in the CSV)
+        all_tags = set()
+        if "tags" in df.columns:
+            for tags_str in df["tags"].dropna():
+                if tags_str:
+                    for tag in str(tags_str).split("|"):
+                        tag = tag.strip()
+                        if tag and tag.lower() != "unknown":
+                            all_tags.add(tag)
+        
+        _autocomplete_index = {
+            "titles": titles[:200],  # Limit to prevent massive responses
+            "typologies": list(set(typologies))[:50],
+            "architects": list(set(architects))[:100],
+            "cities": list(set(cities))[:100],
+            "tags": list(all_tags)[:200],
+        }
+        logger.info(f"Built autocomplete index: {len(titles)} titles, {len(typologies)} typologies, {len(architects)} architects, {len(cities)} cities, {len(all_tags)} tags")
+        return _autocomplete_index
+    except Exception as e:
+        logger.error(f"Failed to build autocomplete index: {e}")
+        _autocomplete_index = {"titles": [], "typologies": [], "architects": [], "cities": [], "tags": []}
+        return _autocomplete_index
+
+
+@app.get("/autocomplete")
+def autocomplete(
+    q: str = Query(..., min_length=1, description="Query prefix to search for"),
+    limit: int = Query(8, ge=1, le=20, description="Maximum number of suggestions"),
+    _: bool = Depends(require_token),
+):
+    """
+    Fast autocomplete endpoint for search suggestions.
+    Returns matches from project titles, typologies, architects, cities, and tags.
+    Uses substring matching with results sorted by relevance.
+    """
+    index = get_autocomplete_index()
+    q_lower = q.lower()
+    suggestions = []
+    
+    # Helper to score matches (prefix match scores higher than substring)
+    def score_match(value: str, query: str) -> int:
+        v_lower = value.lower()
+        if v_lower.startswith(query):
+            return 100 - len(value)  # Shorter prefix matches rank higher
+        elif query in v_lower:
+            return 50 - len(value)
+        return 0
+    
+    # Search each category
+    for category, values in [
+        ("typology", index.get("typologies", [])),
+        ("architect", index.get("architects", [])),
+        ("city", index.get("cities", [])),
+        ("tag", index.get("tags", [])),
+        ("title", index.get("titles", [])),
+    ]:
+        for value in values:
+            if not value:
+                continue
+            score = score_match(value, q_lower)
+            if score > 0:
+                suggestions.append({
+                    "type": category,
+                    "value": value,
+                    "score": score,
+                })
+    
+    # Sort by score descending, then alphabetically
+    suggestions.sort(key=lambda x: (-x["score"], x["value"].lower()))
+    
+    # Remove score from output and limit
+    result = [{"type": s["type"], "value": s["value"]} for s in suggestions[:limit]]
+    
+    return {
+        "query": q,
+        "suggestions": result,
+    }
 
 
 @app.post("/enterprise/lead")
@@ -826,10 +930,23 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
         
         hydrated_results.append(result)
         
-        if len(hydrated_results) >= body.top_k:
+        # Collect enough for pagination (top_k or page calculation)
+        max_needed = max(body.top_k, body.page * body.page_size + 1)
+        if len(hydrated_results) >= max_needed:
             break
     
     ms = int((time.time() - t0) * 1000)
+    
+    # Apply pagination
+    total_count = len(hydrated_results)
+    start_idx = (body.page - 1) * body.page_size
+    end_idx = start_idx + body.page_size
+    paginated_results = hydrated_results[start_idx:end_idx]
+    has_more = end_idx < total_count
+    
+    # Re-assign ranks for paginated results
+    for i, result in enumerate(paginated_results):
+        result["rank"] = start_idx + i + 1
     
     return {
         "query_id": query_id,
@@ -837,12 +954,16 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
         "latency_ms": ms,
         "query": body.query,
         "filters": body.filters.model_dump(),
-        "results": hydrated_results,
+        "results": paginated_results,
+        "page": body.page,
+        "page_size": body.page_size,
+        "has_more": has_more,
+        "total_count": total_count,
         "debug": {
             "text_search": True,
             "index_ready": text_index.is_ready(),
             "raw_results": len(text_results),
-            "filtered_results": len(hydrated_results),
+            "filtered_results": total_count,
         }
     }
 
@@ -850,6 +971,8 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
 def search_text_get(
     q: str = Query(..., description="Search query text"),
     top_k: int = 12,
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(12, ge=1, le=50, description="Results per page"),
     typology: Optional[str] = None,
     climate_bin: Optional[str] = None,
     massing_type: Optional[str] = None,
@@ -860,6 +983,8 @@ def search_text_get(
     body = SearchByText(
         query=q,
         top_k=top_k,
+        page=page,
+        page_size=page_size,
         filters=Filters(typology=typology, climate_bin=climate_bin, massing_type=massing_type),
         strict=strict
     )
@@ -962,6 +1087,8 @@ def search_url(
 async def search_file(
     file: UploadFile = File(...),
     top_k: int = 12,
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(12, ge=1, le=50, description="Results per page"),
     typology: Optional[str] = None,
     climate_bin: Optional[str] = None,
     massing_type: Optional[str] = None,
@@ -1131,6 +1258,17 @@ async def search_file(
     except Exception:
         pass
     
+    # Apply pagination
+    total_count = len(final_results)
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    paginated_results = final_results[start_idx:end_idx]
+    has_more = end_idx < total_count
+    
+    # Re-assign ranks for paginated results
+    for i, result in enumerate(paginated_results):
+        result["rank"] = start_idx + i + 1
+    
     return {
         "query_id": query_id,
         "embed_latency_ms": embed_ms,
@@ -1138,7 +1276,11 @@ async def search_file(
         "weights": w.model_dump(),
         "weights_effective": debug_info["weights_effective"],
         "filters": f.model_dump(),
-        "results": final_results,
+        "results": paginated_results,
+        "page": page,
+        "page_size": page_size,
+        "has_more": has_more,
+        "total_count": total_count,
         "debug": {**debug_info, "fusion_latency_ms": fusion_ms}
     }
 
@@ -1150,6 +1292,8 @@ async def search_hybrid(
     image_id: Optional[str] = Query(None, description="Image ID to use as visual query (alternative to file upload)"),
     query: Optional[str] = Query(None, description="Text query for semantic search"),
     top_k: int = Query(12, description="Number of results to return"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(12, ge=1, le=50, description="Results per page"),
     w_visual: float = Query(0.5, ge=0.0, le=1.0, description="Weight for visual search results"),
     w_text: float = Query(0.5, ge=0.0, le=1.0, description="Weight for text search results"),
     _: bool = Depends(require_token),
@@ -1309,13 +1453,19 @@ async def search_hybrid(
         
         final_results.append(result)
     
-    # Sort by combined score and take top_k
+    # Sort by combined score
     final_results.sort(key=lambda x: -x["combined_score"])
-    final_results = final_results[:top_k]
     
-    # Assign ranks
-    for i, result in enumerate(final_results, start=1):
-        result["rank"] = i
+    # Apply pagination
+    total_count = len(final_results)
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    paginated_results = final_results[start_idx:end_idx]
+    has_more = end_idx < total_count
+    
+    # Assign ranks for paginated results
+    for i, result in enumerate(paginated_results):
+        result["rank"] = start_idx + i + 1
         # Use combined_score as the primary score for consistency
         result["score"] = result["combined_score"]
     
@@ -1333,7 +1483,11 @@ async def search_hybrid(
         },
         "has_visual": visual_embedding is not None,
         "has_text": bool(query and query.strip()),
-        "results": final_results,
+        "results": paginated_results,
+        "page": page,
+        "page_size": page_size,
+        "has_more": has_more,
+        "total_count": total_count,
     }
 
 

@@ -22,6 +22,8 @@ The following improvements have been **implemented**:
 | 6 | Better Weight Normalization | ✅ **DONE** | Widened clamp range from [0.1, 0.7] to [0.0, 0.95]. Added `strict` mode for backward compatibility. |
 | 11 | Search Result Explanations | ✅ **DONE** | Enhanced `get_explanation()` with human-readable `match_reason`. Updated `MatchReasonBadge` tooltip. |
 | 8 | Hybrid Search (Text + Image) | ✅ **DONE** | New `/search/hybrid` endpoint combines visual and text search with weighted fusion. Drag-and-drop from results to search bar. |
+| 9 | Search Autocomplete/Suggestions | ✅ **DONE** | New `/autocomplete` endpoint. In-memory index from projects.csv. Frontend dropdown with category badges. |
+| 12 | Progressive Result Loading | ✅ **DONE** | Added `page`/`page_size` params to search endpoints. Load More button in ClassicSearchPage and StudyResultsPage. |
 
 **Additional UI improvements:**
 - Filter sidebar now collapsed by default (`FilterSidebar.tsx`)
@@ -186,7 +188,7 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 ## 🟡 User Experience Enhancements
 
-### 9. **Search Autocomplete/Suggestions**
+### 9. **Search Autocomplete/Suggestions** ✅ IMPLEMENTED
 **Current Issue**: No query autocomplete or suggestions
 
 **Recommendation**:
@@ -194,6 +196,15 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 - Implement fuzzy matching for typos
 - Show suggestions based on popular searches
 - Use Trie or Elasticsearch for fast prefix matching
+
+**Implementation Details**:
+- Created `/autocomplete` endpoint in `main.py` with in-memory index
+- Index built from projects.csv: titles, typologies, architects, cities, tags
+- Substring and prefix matching with relevance scoring (prefix matches rank higher)
+- Added `getAutocomplete()` function in `navigatorApi.ts`
+- Frontend dropdown in `ClassicSearchBar.tsx` with category badges (color-coded by type)
+- Keyboard navigation (arrow keys) and debounced API calls (150ms)
+- Suggestions disappear when search history is shown
 
 **Impact**: Faster query entry, reduced typos, better discovery
 
@@ -228,7 +239,7 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: Better user understanding, improved trust in results
 
-### 12. **Progressive Result Loading**
+### 12. **Progressive Result Loading** ✅ IMPLEMENTED
 **Current Issue**: All results loaded at once, no pagination
 
 **Recommendation**:
@@ -236,6 +247,14 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 - Load top results first, then progressively load more
 - Show loading indicators per result batch
 - Cache pages for back/forward navigation
+
+**Implementation Details**:
+- Added `page` and `page_size` parameters to `/search/text`, `/search/file`, `/search/hybrid` endpoints
+- Response includes `has_more`, `total_count`, `page`, `page_size` fields
+- Frontend pagination state with "Load More" button in `ClassicSearchPage.tsx` and `StudyResultsPage.tsx`
+- Button shows current count vs total (e.g., "Load More (12 of 50)")
+- Results append on "Load More" click, ranks continue from previous page
+- Page resets on new search; clear search also resets pagination
 
 **Impact**: Faster initial render, better perceived performance
 
@@ -452,8 +471,8 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 ### High Impact + High Effort (Major Projects)
 1. Unified search pipeline (#14)
 2. Pre-filtering optimization (#1)
-3. Hybrid text+visual search (#8)
-4. Search autocomplete (#9)
+3. ~~Hybrid text+visual search (#8)~~ ✅ DONE
+4. ~~Search autocomplete (#9)~~ ✅ DONE
 
 ### Medium Impact (Quality Improvements)
 1. ~~Improved distance normalization (#5)~~ ✅ DONE
@@ -461,7 +480,7 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 3. ~~Search by Image ID (#15)~~ ✅ DONE
 4. ~~Better weight normalization (#6)~~ ✅ DONE
 5. ~~Search explanations (#11)~~ ✅ DONE
-6. Progressive loading (#12)
+6. ~~Progressive loading (#12)~~ ✅ DONE
 7. Query expansion (#18)
 8. Patch match heatmaps (#25)
 
@@ -485,11 +504,11 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 - Unified pipeline migration (#14)
 
 ### Phase 3 (4-6 weeks): Quality & UX
-- Search autocomplete (#9)
+- ~~Search autocomplete (#9)~~ ✅
 - ~~Better weight normalization (#6)~~ ✅
 - ~~Result explanations (#11)~~ ✅
-- Progressive loading (#12)
-- Hybrid search (#8)
+- ~~Progressive loading (#12)~~ ✅
+- ~~Hybrid search (#8)~~ ✅
 
 ### Phase 4 (6+ weeks): Advanced Features
 - Relevance feedback (#19)

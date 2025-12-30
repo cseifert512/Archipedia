@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, X, Upload, Link as LinkIcon, ChevronDown, ChevronUp, Clock, Trash2 } from 'lucide-react';
+import { Camera, X, Upload, Link as LinkIcon, ChevronDown, ChevronUp, Clock, Trash2, Search } from 'lucide-react';
 import { getHistory, removeFromHistory, formatTimestamp, type SearchHistoryItem } from '../../lib/searchHistory';
+import { getAutocomplete, type AutocompleteSuggestion } from '../../lib/navigatorApi';
 
 export type MatchEmphasis = 'visual' | 'balanced' | 'semantic';
 
@@ -31,7 +32,13 @@ export function ClassicSearchBar({
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
   
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Load history when dropdown opens
   useEffect(() => {
@@ -39,6 +46,36 @@ export function ClassicSearchBar({
       setHistory(getHistory());
     }
   }, [showHistory]);
+
+  // Fetch autocomplete suggestions with debounce
+  useEffect(() => {
+    // Don't show suggestions if history dropdown is open
+    if (showHistory) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    
+    if (query.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    
+    const timer = setTimeout(async () => {
+      try {
+        const results = await getAutocomplete(query.trim(), 8);
+        setSuggestions(results);
+        setShowSuggestions(results.length > 0);
+        setSelectedSuggestionIndex(-1);
+      } catch (error) {
+        console.error('Autocomplete error:', error);
+        setSuggestions([]);
+      }
+    }, 150);
+    
+    return () => clearTimeout(timer);
+  }, [query, showHistory]);
 
   const hasImage = imageFile || imageUrl;
   const hasQuery = query.trim().length > 0;
@@ -153,12 +190,37 @@ export function ClassicSearchBar({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle autocomplete navigation
+    if (showSuggestions && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        );
+        return;
+      }
+      if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+        e.preventDefault();
+        handleSuggestionSelect(suggestions[selectedSuggestionIndex]);
+        return;
+      }
+    }
+    
     if (e.key === 'Enter' && !isSearching) {
       handleSearch();
       setShowHistory(false);
+      setShowSuggestions(false);
     }
     if (e.key === 'Escape') {
       setShowHistory(false);
+      setShowSuggestions(false);
     }
   };
 
@@ -170,8 +232,19 @@ export function ClassicSearchBar({
   };
 
   const handleInputBlur = () => {
-    // Delay hiding to allow clicking history items
-    setTimeout(() => setShowHistory(false), 200);
+    // Delay hiding to allow clicking items
+    setTimeout(() => {
+      setShowHistory(false);
+      setShowSuggestions(false);
+    }, 200);
+  };
+
+  const handleSuggestionSelect = (suggestion: AutocompleteSuggestion) => {
+    setQuery(suggestion.value);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    // Trigger search with the selected suggestion
+    onSearch(suggestion.value, imageFile || imageUrl, emphasis);
   };
 
   const handleHistorySelect = (item: SearchHistoryItem) => {
@@ -289,11 +362,12 @@ export function ClassicSearchBar({
         {/* Text Input */}
         <div style={{ flex: 1, position: 'relative' }}>
           <input
+            ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              // Hide history when typing
+              // Hide history when typing, show suggestions
               if (e.target.value.trim()) {
                 setShowHistory(false);
               }
@@ -407,6 +481,108 @@ export function ClassicSearchBar({
                   >
                     <Trash2 size={14} />
                   </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Autocomplete Suggestions Dropdown */}
+          {showSuggestions && suggestions.length > 0 && !showHistory && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                border: '1px solid rgba(0,0,0,0.1)',
+                zIndex: 1000,
+                marginTop: '4px',
+                maxHeight: '300px',
+                overflowY: 'auto',
+              }}
+            >
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderBottom: '1px solid rgba(0,0,0,0.05)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Search size={12} style={{ opacity: 0.5 }} />
+                <span
+                  style={{
+                    fontFamily: 'var(--font-secondary)',
+                    fontSize: '11px',
+                    color: 'rgba(0,0,0,0.5)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Suggestions
+                </span>
+              </div>
+              {suggestions.map((suggestion, index) => (
+                <div
+                  key={`${suggestion.type}-${suggestion.value}-${index}`}
+                  onClick={() => handleSuggestionSelect(suggestion)}
+                  style={{
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    backgroundColor: selectedSuggestionIndex === index ? 'rgba(0,0,0,0.05)' : 'transparent',
+                    transition: 'background 150ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)';
+                    setSelectedSuggestionIndex(index);
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedSuggestionIndex !== index) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-secondary)',
+                      fontSize: '10px',
+                      padding: '2px 6px',
+                      backgroundColor: 
+                        suggestion.type === 'typology' ? 'rgba(182, 68, 36, 0.1)' :
+                        suggestion.type === 'architect' ? 'rgba(68, 102, 182, 0.1)' :
+                        suggestion.type === 'city' ? 'rgba(68, 182, 102, 0.1)' :
+                        suggestion.type === 'tag' ? 'rgba(182, 68, 182, 0.1)' :
+                        'rgba(0,0,0,0.05)',
+                      color:
+                        suggestion.type === 'typology' ? 'rgba(182, 68, 36, 1)' :
+                        suggestion.type === 'architect' ? 'rgba(68, 102, 182, 1)' :
+                        suggestion.type === 'city' ? 'rgba(68, 132, 102, 1)' :
+                        suggestion.type === 'tag' ? 'rgba(142, 68, 142, 1)' :
+                        'rgba(0,0,0,0.6)',
+                      borderRadius: '4px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.3px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {suggestion.type}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-primary)',
+                      fontSize: '14px',
+                      color: '#1a1a1a',
+                    }}
+                  >
+                    {suggestion.value}
+                  </span>
                 </div>
               ))}
             </div>

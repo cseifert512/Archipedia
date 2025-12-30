@@ -49,6 +49,13 @@ export function ClassicSearchPage() {
   const [results, setResults] = useState<SearchResultData[]>([]);
   const [sortBy, setSortBy] = useState<SortOption>('best');
   const [searchError, setSearchError] = useState<{ message: string; suggestion?: string } | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 12;
 
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -112,9 +119,12 @@ export function ClassicSearchPage() {
       setQuery(searchQuery);
       setUploadedImage(searchImage);
       setEmphasis(searchEmphasis);
+      setCurrentPage(1);  // Reset pagination on new search
 
       try {
         let apiResults: any[] = [];
+        let apiHasMore = false;
+        let apiTotalCount = 0;
 
         // Decide which API to call based on input type
         const hasImage = searchImage && searchImage instanceof File;
@@ -128,23 +138,36 @@ export function ClassicSearchPage() {
             file: searchImage as File,
             query: searchQuery.trim(),
             topK: 50,
+            page: 1,
+            pageSize: PAGE_SIZE,
             wVisual,
             wText,
           });
           apiResults = response.results || [];
+          apiHasMore = response.has_more ?? false;
+          apiTotalCount = response.total_count ?? apiResults.length;
         } else if (hasImage) {
           // Image-only search
           const response = await searchByImageFile(searchImage as File, {
             topK: 50,
+            page: 1,
+            pageSize: PAGE_SIZE,
             wVisual: searchEmphasis === 'visual' ? 1.0 : 0.5,
             wAttr: searchEmphasis === 'semantic' ? 0.5 : 0.25,
           });
           apiResults = response.results || [];
+          apiHasMore = response.has_more ?? false;
+          apiTotalCount = response.total_count ?? apiResults.length;
         } else if (hasText) {
           // Text-only search
-          const response = await searchByText(searchQuery, { topK: 50 });
+          const response = await searchByText(searchQuery, { topK: 50, page: 1, pageSize: PAGE_SIZE });
           apiResults = response.results || [];
+          apiHasMore = response.has_more ?? false;
+          apiTotalCount = response.total_count ?? apiResults.length;
         }
+        
+        setHasMore(apiHasMore);
+        setTotalCount(apiTotalCount);
 
         // Transform API results to SearchResultData format
         const transformedResults: SearchResultData[] = apiResults.map((result, index) => {
@@ -258,6 +281,100 @@ export function ClassicSearchPage() {
     }
   }, [results, sortBy]);
 
+  // Load more results (pagination)
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    
+    setIsLoadingMore(true);
+    const nextPage = currentPage + 1;
+    
+    try {
+      let apiResults: any[] = [];
+      let apiHasMore = false;
+      
+      const hasImage = uploadedImage && uploadedImage instanceof File;
+      const hasText = query.trim().length > 0;
+      
+      if (hasImage && hasText) {
+        const wVisual = emphasis === 'visual' ? 0.7 : emphasis === 'semantic' ? 0.3 : 0.5;
+        const wText = 1.0 - wVisual;
+        const response = await searchHybrid({
+          file: uploadedImage as File,
+          query: query.trim(),
+          topK: 50,
+          page: nextPage,
+          pageSize: PAGE_SIZE,
+          wVisual,
+          wText,
+        });
+        apiResults = response.results || [];
+        apiHasMore = response.has_more ?? false;
+      } else if (hasImage) {
+        const response = await searchByImageFile(uploadedImage as File, {
+          topK: 50,
+          page: nextPage,
+          pageSize: PAGE_SIZE,
+          wVisual: emphasis === 'visual' ? 1.0 : 0.5,
+          wAttr: emphasis === 'semantic' ? 0.5 : 0.25,
+        });
+        apiResults = response.results || [];
+        apiHasMore = response.has_more ?? false;
+      } else if (hasText) {
+        const response = await searchByText(query, { topK: 50, page: nextPage, pageSize: PAGE_SIZE });
+        apiResults = response.results || [];
+        apiHasMore = response.has_more ?? false;
+      }
+      
+      // Transform and append results
+      const transformedResults: SearchResultData[] = apiResults.map((result, index) => {
+        const score = result.score ?? (1 - (result.distance ?? 0.5));
+        const thumbUrl = toAbsoluteUrl(result.thumb_url) || '';
+        
+        let projectImages: ProjectImage[] = [];
+        if (result.image_urls && Array.isArray(result.image_urls) && result.image_urls.length > 0) {
+          projectImages = result.image_urls.map((url: string, idx: number) => ({
+            image_id: `img_${result.project_id}_${idx}`,
+            thumb_url: url,
+            image_url: url,
+          }));
+        } else if (thumbUrl) {
+          projectImages = [{
+            image_id: result.image_id || `img_${result.project_id}_01`,
+            thumb_url: thumbUrl,
+            image_url: thumbUrl,
+          }];
+        }
+        
+        return {
+          project_id: result.project_id || `project-${index}`,
+          project_title: result.title || result.project_id || 'Unknown Project',
+          architect: result.architect || 'Unknown Architect',
+          location_display: result.country || 'Unknown Location',
+          year: result.year || 2024,
+          image_id: result.image_id || `img_${result.project_id}_01`,
+          thumb_url: projectImages[0]?.thumb_url || thumbUrl,
+          image_url: projectImages[0]?.image_url || thumbUrl,
+          images: projectImages,
+          score: score,
+          match_reason: result.match_reason || 'Match',
+          badges: {
+            typology: result.typology ? [result.typology] : [],
+            country: result.country ? [result.country] : [],
+            climate_bin: result.climate_bin ? [result.climate_bin] : [],
+          },
+        };
+      });
+      
+      setResults(prev => [...prev, ...transformedResults]);
+      setCurrentPage(nextPage);
+      setHasMore(apiHasMore);
+    } catch (error) {
+      console.error('Load more failed:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [currentPage, hasMore, isLoadingMore, uploadedImage, query, emphasis]);
+
   // Handlers
   const handleSearch = (q: string, image: File | string | null, emp: MatchEmphasis) => {
     performSearch(q, image, emp);
@@ -268,6 +385,9 @@ export function ClassicSearchPage() {
     setUploadedImage(null);
     setResults([]);
     setHasSearched(false);
+    setCurrentPage(1);
+    setHasMore(false);
+    setTotalCount(0);
   };
 
   const handleClearFilters = () => {
@@ -670,6 +790,29 @@ export function ClassicSearchPage() {
                   />
                 ))}
               </div>
+              
+              {/* Load More Button */}
+              {hasMore && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
+                  <button
+                    onClick={loadMore}
+                    disabled={isLoadingMore}
+                    style={{
+                      fontFamily: 'var(--font-primary)',
+                      fontSize: '14px',
+                      padding: '14px 40px',
+                      backgroundColor: isLoadingMore ? 'rgba(0,0,0,0.1)' : 'var(--accent)',
+                      color: isLoadingMore ? 'rgba(0,0,0,0.4)' : 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: isLoadingMore ? 'not-allowed' : 'pointer',
+                      transition: 'all 150ms ease',
+                    }}
+                  >
+                    {isLoadingMore ? 'Loading...' : `Load More (${results.length} of ${totalCount})`}
+                  </button>
+                </div>
+              )}
             ) : (
               <div
                 style={{
