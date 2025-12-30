@@ -25,13 +25,30 @@ class Pipeline:
         self.attribute_features = attribute_features
         self.patch_features = patch_features
     
-    def normalize_weights(self, weights: Weights) -> Tuple[float, float, float]:
-        """Normalize weights to sum to 1 and clamp to [0.1, 0.7]."""
+    def normalize_weights(self, weights: Weights, strict: bool = False) -> Tuple[float, float, float]:
+        """Normalize weights to sum to 1 with optional clamping.
+        
+        Args:
+            weights: Input weights for visual, spatial, and attribute components
+            strict: If True, uses tight [0.1, 0.7] clamp (legacy behavior).
+                   If False, uses wider [0.0, 0.95] range for more flexibility.
+        
+        Returns:
+            Tuple of (visual_weight, spatial_weight, attr_weight) normalized to sum to 1
+        """
         total = max(1e-9, weights.visual + weights.spatial + weights.attr)
         v, s, a = weights.visual/total, weights.spatial/total, weights.attr/total
         
-        # Clamp function
-        clamp = lambda x: min(max(x, 0.1), 0.7)
+        # Clamp function - strict mode preserves legacy behavior
+        if strict:
+            # Legacy tight range - prevents any single dimension from dominating
+            clamp = lambda x: min(max(x, 0.1), 0.7)
+        else:
+            # Wider range allows near-pure visual/spatial/attr searches
+            # Min 0.0 allows disabling unused dimensions (e.g., no spatial features)
+            # Max 0.95 prevents complete single-dimension search (keeps some diversity)
+            clamp = lambda x: min(max(x, 0.0), 0.95)
+        
         return clamp(v), clamp(s), clamp(a)
     
     def _normalize_distances(self, distances: List[float]) -> List[float]:
@@ -179,19 +196,103 @@ class Pipeline:
         
         return results[:k]
     
-    def get_explanation(self, query_vector: np.ndarray, image_id: str, project_id: str) -> Dict:
-        """Generate explanation for why an image is similar."""
+    def get_explanation(self, query_vector: np.ndarray, image_id: str, project_id: str,
+                        score: float = 0.0, weights: Optional[Weights] = None) -> Dict:
+        """Generate explanation for why an image is similar.
+        
+        Args:
+            query_vector: The query embedding vector
+            image_id: ID of the result image
+            project_id: ID of the result project
+            score: The fusion score for this result
+            weights: The weights used for scoring (to determine primary match type)
+        
+        Returns:
+            Dict with explanation including match_reason, attributes, patch_match, etc.
+        """
         explanation = {}
         
         # Get patch match if available
+        has_patch_match = False
         if self.patch_features:
             patch_match = self.patch_features.get_best_patch_match(query_vector, image_id)
             if patch_match:
                 explanation['patch_match'] = patch_match
+                has_patch_match = True
         
         # Get attribute matches
         project_attrs = self.attribute_features._get_project_attributes(project_id)
+        matched_attrs = []
         if project_attrs:
             explanation['attributes'] = project_attrs
+            # Build list of matched attribute names for display
+            for key, value in project_attrs.items():
+                if value and value not in ['unknown', 'Unknown', '']:
+                    matched_attrs.append(f"{key}: {value}")
+        
+        # Generate human-readable match reason based on dominant factor
+        match_reason = self._generate_match_reason(
+            score=score,
+            weights=weights,
+            has_patch_match=has_patch_match,
+            matched_attrs=matched_attrs,
+            project_attrs=project_attrs
+        )
+        explanation['match_reason'] = match_reason
+        explanation['matched_attrs'] = matched_attrs
         
         return explanation
+    
+    def _generate_match_reason(self, score: float, weights: Optional[Weights],
+                               has_patch_match: bool, matched_attrs: List[str],
+                               project_attrs: Optional[Dict]) -> str:
+        """Generate a human-readable match reason based on scoring factors.
+        
+        Args:
+            score: The fusion score
+            weights: The weights used for scoring
+            has_patch_match: Whether a patch match was found
+            matched_attrs: List of matched attribute strings
+            project_attrs: Raw project attributes dict
+        
+        Returns:
+            Human-readable explanation string
+        """
+        # Determine dominant match type from weights
+        if weights:
+            w_v, w_s, w_a = self.normalize_weights(weights)
+            max_weight = max(w_v, w_s, w_a)
+            
+            if w_v == max_weight:
+                if has_patch_match:
+                    return "Strong visual detail match"
+                elif score >= 0.8:
+                    return "Very similar visual style"
+                elif score >= 0.6:
+                    return "Similar visual appearance"
+                else:
+                    return "Visual similarity"
+            elif w_s == max_weight:
+                return "Similar spatial layout"
+            elif w_a == max_weight:
+                # Build reason from matched attributes
+                if project_attrs:
+                    typology = project_attrs.get('typology', '')
+                    climate = project_attrs.get('climate_bin', '')
+                    if typology:
+                        return f"Same typology: {typology}"
+                    elif climate:
+                        return f"Same climate zone: {climate}"
+                return "Matching attributes"
+        
+        # Default case: balanced or no weights
+        if has_patch_match:
+            return "Matching architectural details"
+        elif matched_attrs:
+            return "Matching attributes"
+        elif score >= 0.8:
+            return "Highly similar"
+        elif score >= 0.6:
+            return "Similar project"
+        else:
+            return "Related project"

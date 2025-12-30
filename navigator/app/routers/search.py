@@ -70,15 +70,20 @@ async def search(request: SearchRequest):
             # Extract project_id from image_id
             project_id = image_id.split('_', 1)[0] if '_' in image_id else image_id
             
-            # Generate explanation
-            explanation = pipeline.get_explanation(query_vector, image_id, project_id)
+            # Generate explanation with score and weights for better match reasons
+            explanation = pipeline.get_explanation(
+                query_vector, image_id, project_id,
+                score=float(score),
+                weights=request.weights
+            )
             
-            # Create why block
-            why_block = WhyBlock()
-            if 'patch_match' in explanation:
-                why_block.patch_match = explanation['patch_match']
-            if 'attributes' in explanation:
-                why_block.attr_hits = explanation['attributes']
+            # Create why block with all explanation data
+            why_block = WhyBlock(
+                patch_match=explanation.get('patch_match'),
+                attr_hits=explanation.get('attributes'),
+                match_reason=explanation.get('match_reason'),
+                matched_attrs=explanation.get('matched_attrs')
+            )
             
             # Create result
             result = SearchResult(

@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-12-30T08:30:11.948370",
+  "improvement": "#6 - Better Weight Normalization",
+  "status": "COMPLETE",
+  "tests": {
+    "default_mode": "PASS",
+    "strict_mode": "PASS",
+    "extreme_weights": "PASS"
+  },
+  "changes": [
+    "Widened default clamp range from [0.1, 0.7] to [0.0, 0.95]",
+    "Added strict parameter to preserve legacy behavior",
+    "Allows near-pure visual/spatial/attribute searches"
+  ]
+}

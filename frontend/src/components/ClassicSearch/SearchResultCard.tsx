@@ -19,7 +19,8 @@ export interface SearchResultData {
   image_url: string;
   images?: ProjectImage[]; // Multiple images for the project
   score: number;
-  match_reason?: string;
+  match_reason?: string;  // Human-readable explanation from backend
+  matched_attrs?: string[];  // List of matched attribute strings from backend
   badges?: {
     typology?: string[];
     country?: string[];
@@ -288,6 +289,7 @@ export function SearchResultCard({
             reason={result.match_reason}
             typology={result.badges?.typology?.[0]}
             country={result.badges?.country?.[0]}
+            matchedAttrs={result.matched_attrs}
           />
         </div>
       </div>

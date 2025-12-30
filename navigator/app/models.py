@@ -22,6 +22,8 @@ class SearchRequest(BaseModel):
 class WhyBlock(BaseModel):
     patch_match: Optional[Dict] = None  # {image_id, patch_idx, score}
     attr_hits: Optional[Dict[str, str]] = None
+    match_reason: Optional[str] = None  # Human-readable explanation (e.g., "Similar visual style")
+    matched_attrs: Optional[List[str]] = None  # List of matched attribute strings
 
 class SearchResult(BaseModel):
     project_id: str

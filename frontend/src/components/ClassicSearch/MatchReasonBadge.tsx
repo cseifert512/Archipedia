@@ -5,21 +5,38 @@ interface MatchReasonBadgeProps {
   reason?: string;
   typology?: string;
   country?: string;
+  matchedAttrs?: string[];  // List of matched attribute strings from backend
 }
 
-export function MatchReasonBadge({ score, reason, typology, country }: MatchReasonBadgeProps) {
+export function MatchReasonBadge({ score, reason, typology, country, matchedAttrs }: MatchReasonBadgeProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const displayScore = (score * 100).toFixed(0);
-  const matchType = reason || 'Visual match';
+  // Use the provided reason from backend, fallback to generated one
+  const matchType = reason || (score >= 0.8 ? 'Very similar' : score >= 0.6 ? 'Similar' : 'Related');
 
-  const tooltipContent = [
-    `${matchType} (${(score).toFixed(2)})`,
-    typology && `Typology: ${typology}`,
-    country && `Country: ${country}`,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  // Build rich tooltip content
+  const tooltipLines: string[] = [];
+  
+  // Primary match reason with score
+  tooltipLines.push(`${matchType} (${(score * 100).toFixed(0)}%)`);
+  
+  // Add typology and country if provided
+  if (typology) tooltipLines.push(`Typology: ${typology}`);
+  if (country) tooltipLines.push(`Location: ${country}`);
+  
+  // Add matched attributes from backend (limit to 3 to avoid clutter)
+  if (matchedAttrs && matchedAttrs.length > 0) {
+    const attrsToShow = matchedAttrs.slice(0, 3);
+    attrsToShow.forEach(attr => {
+      // Only add if not already covered by typology/country
+      if (!attr.toLowerCase().includes('typology') && !attr.toLowerCase().includes('country')) {
+        tooltipLines.push(attr);
+      }
+    });
+  }
+  
+  const tooltipContent = tooltipLines.join(' · ');
 
   return (
     <div

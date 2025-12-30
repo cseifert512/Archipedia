@@ -19,6 +19,8 @@ The following improvements have been **implemented**:
 | 16 | Better error messages | ✅ **DONE** | Structured errors with `{error, message, suggestion}` in backend. Error UI in search pages. |
 | 7 | Fusion Score Normalization | ✅ **DONE** | Added `_normalize_distances()` method in `pipeline.py`. Min-max normalization applied to visual, spatial, attr distances before fusion. |
 | 15 | Search by Image ID | ✅ **DONE** | Implemented `query_image_id` support in `search.py` using `FaissStore.vector_for_image()`. |
+| 6 | Better Weight Normalization | ✅ **DONE** | Widened clamp range from [0.1, 0.7] to [0.0, 0.95]. Added `strict` mode for backward compatibility. |
+| 11 | Search Result Explanations | ✅ **DONE** | Enhanced `get_explanation()` with human-readable `match_reason`. Updated `MatchReasonBadge` tooltip. |
 
 **Additional UI improvements:**
 - Filter sidebar now collapsed by default (`FilterSidebar.tsx`)
@@ -106,15 +108,22 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: Better score normalization, improved relevance
 
-### 6. **Better Weight Normalization**
+### 6. **Better Weight Normalization** ✅ IMPLEMENTED
 **Current Issue**: Hard clamping [0.1, 0.7] is too restrictive, doesn't adapt to query type
 
-**Location**: `navigator/app/services/pipeline.py:22-29`
+**Location**: `navigator/app/services/pipeline.py:28-51`
 
 **Recommendation**:
 - Allow wider weight ranges for different search modes
 - Implement adaptive weight adjustment based on query characteristics
 - Use learned weight combinations for different query types
+
+**Implementation Details**:
+- Widened default clamp range from [0.1, 0.7] to [0.0, 0.95]
+- Added `strict` parameter to `normalize_weights()` for backward compatibility
+- Min 0.0 allows disabling unused dimensions (e.g., no spatial features)
+- Max 0.95 prevents complete single-dimension search while allowing near-pure searches
+- Tested with `test_weight_normalization.py` script
 
 **Impact**: More flexible and accurate search results
 
@@ -189,16 +198,23 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: Improved user workflow, easier iteration
 
-### 11. **Search Result Explanations**
+### 11. **Search Result Explanations** ✅ IMPLEMENTED
 **Current Issue**: Limited explanation for why results match (get_explanation exists but underutilized)
 
-**Location**: `navigator/app/services/pipeline.py:145-160`
+**Location**: `navigator/app/services/pipeline.py:182-270`
 
 **Recommendation**:
 - Expose explanation endpoint in API
 - Show match reasons in frontend (e.g., "Similar visual style", "Same typology", "Matching spatial layout")
 - Highlight matched attributes/filters
 - Visual indicators for match strength
+
+**Implementation Details**:
+- Enhanced `get_explanation()` to return human-readable `match_reason` based on weights and score
+- Added `_generate_match_reason()` helper method with context-aware explanations
+- Added `matched_attrs` list to WhyBlock for display in frontend
+- Updated `MatchReasonBadge.tsx` to show detailed tooltip with match reason and attributes
+- Match reasons adapt based on: dominant weight, score level, patch matches, and matched attributes
 
 **Impact**: Better user understanding, improved trust in results
 
@@ -433,10 +449,11 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 1. ~~Improved distance normalization (#5)~~ ✅ DONE
 2. ~~Fusion normalization (#7)~~ ✅ DONE
 3. ~~Search by Image ID (#15)~~ ✅ DONE
-4. Search explanations (#11)
-5. Progressive loading (#12)
-6. Query expansion (#18)
-7. Patch match heatmaps (#25)
+4. ~~Better weight normalization (#6)~~ ✅ DONE
+5. ~~Search explanations (#11)~~ ✅ DONE
+6. Progressive loading (#12)
+7. Query expansion (#18)
+8. Patch match heatmaps (#25)
 
 ---
 
@@ -459,7 +476,8 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 ### Phase 3 (4-6 weeks): Quality & UX
 - Search autocomplete (#9)
-- Result explanations (#11)
+- ~~Better weight normalization (#6)~~ ✅
+- ~~Result explanations (#11)~~ ✅
 - Progressive loading (#12)
 - Hybrid search (#8)
 
