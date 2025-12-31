@@ -13,6 +13,14 @@ export interface BoardDoc {
   updated_at: string;
 }
 
+// Legacy node types for backwards compatibility with ResultsPage
+export interface LegacyNode {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: Record<string, any>;
+}
+
 interface CanvasState {
   // Document state
   boardId: string | null;
@@ -32,6 +40,10 @@ interface CanvasState {
   hasConflict: boolean;
   conflictVersion: number | null;
   
+  // Legacy state for backwards compatibility with ResultsPage
+  nodes: LegacyNode[];
+  selectedNodes: string[];
+  
   // Actions
   setEditor: (editor: Editor | null) => void;
   setBoardId: (boardId: string) => void;
@@ -40,6 +52,10 @@ interface CanvasState {
   markUnsaved: () => void;
   resolveConflict: (action: 'reload' | 'overwrite') => Promise<void>;
   reset: () => void;
+  
+  // Legacy actions for backwards compatibility
+  addNodes: (nodes: LegacyNode[]) => void;
+  executeWorkflow: () => Promise<void>;
 }
 
 // ============ Debounce Helper ============
@@ -61,6 +77,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   hasUnsavedChanges: false,
   hasConflict: false,
   conflictVersion: null,
+  
+  // Legacy state for backwards compatibility
+  nodes: [],
+  selectedNodes: [],
 
   setEditor: (editor) => {
     set({ editor });
@@ -235,7 +255,21 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       hasUnsavedChanges: false,
       hasConflict: false,
       conflictVersion: null,
+      nodes: [],
+      selectedNodes: [],
     });
+  },
+  
+  // Legacy actions for backwards compatibility with ResultsPage
+  addNodes: (newNodes) => {
+    set((state) => ({
+      nodes: [...state.nodes, ...newNodes],
+    }));
+  },
+  
+  executeWorkflow: async () => {
+    // Legacy stub - workflow execution is now handled differently
+    console.log('executeWorkflow called - this is a legacy stub');
   },
 }));
 
