@@ -48,3 +48,9 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         value: https://arch-circare-api-bfle.onrender.com
+      # PostHog Analytics - set these manually in Render dashboard
+      # Get Project API Key from: PostHog Dashboard → Project Settings → Project API Key
+      # - key: VITE_POSTHOG_KEY
+      #   sync: false  # Set manually: phc_your_project_api_key_here
+      # - key: VITE_POSTHOG_HOST
+      #   sync: false  # Optional: https://us.i.posthog.com (default) or https://eu.i.posthog.com
