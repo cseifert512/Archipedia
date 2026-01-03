@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange } from 'reactflow';
 import { NodeData } from '../types/nodes';
 import { executeNode, getNodeInputs, topologicalSort, NodeExecutionResult } from '../lib/workflowEngine';
@@ -77,7 +78,9 @@ const AUTOSAVE_DELAY = 700;
 
 // ============ Store ============
 
-export const useCanvasStore = create<CanvasState>((set, get) => ({
+export const useCanvasStore = create<CanvasState>()(
+  persist(
+    (set, get) => ({
   // Initial state
   boardId: null,
   version: 0,
@@ -547,7 +550,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       console.error('[executeWorkflow] Workflow execution failed:', error);
     }
   },
-}));
+}),
+    {
+      name: 'archipedia-canvas-state',
+      storage: createJSONStorage(() => sessionStorage),
+      // Only persist ReactFlow state (nodes, edges) - exclude non-serializable values
+      partialize: (state) => ({
+        nodes: state.nodes,
+        edges: state.edges,
+        selectedNodes: state.selectedNodes,
+      }),
+    }
+  )
+);
 
 // ============ API Helpers ============
 

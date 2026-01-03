@@ -19,17 +19,6 @@ import {
   createOperatorNOTNode 
 } from "../lib/nodeFactory";
 
-interface FilterState {
-  typology: string[];
-  climate: string[];
-}
-
-interface FusionWeights {
-  visual: number;
-  spatial: number;
-  attribute: number;
-}
-
 export function ResultsPage() {
   const [, setLocation] = useLocation();
   // wouter's useLocation only returns pathname, use window.location.search for query params
@@ -37,24 +26,32 @@ export function ResultsPage() {
   const initialSearchQuery = params.get("q") || "";
   const imageParam = params.get("image");
   
-  const [currentSearchQuery, setCurrentSearchQuery] = useState(initialSearchQuery);
-  const [hasSearched, setHasSearched] = useState(!!initialSearchQuery);
+  // Use persisted state from store
+  const { 
+    searchResults, 
+    setSearchResults, 
+    setSearchQuery: setStoreQuery,
+    searchQuery: storedQuery,
+    canvasFilters,
+    setCanvasFilters,
+    canvasFusionWeights,
+    setCanvasFusionWeights,
+    canvasHasSearched,
+    setCanvasHasSearched,
+  } = useSearchStore();
+  
+  // Initialize local state from store or URL params
+  const [currentSearchQuery, setCurrentSearchQuery] = useState(initialSearchQuery || storedQuery);
+  const [hasSearched, setHasSearched] = useState(canvasHasSearched || !!initialSearchQuery);
   const [isSearching, setIsSearching] = useState(false);
   
-  const [filters, setFilters] = useState<FilterState>({
-    typology: [],
-    climate: [],
-  });
-  
-  const [fusionWeights, setFusionWeights] = useState<FusionWeights>({
-    visual: 33,
-    spatial: 33,
-    attribute: 34,
-  });
+  // Use store state for filters and weights (persisted)
+  const filters = canvasFilters;
+  const setFilters = setCanvasFilters;
+  const fusionWeights = canvasFusionWeights;
+  const setFusionWeights = setCanvasFusionWeights;
 
   const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null);
-  
-  const { searchResults, setSearchResults, setSearchQuery: setStoreQuery } = useSearchStore();
   const { nodes, addNodes, executeWorkflow, selectedNodes } = useCanvasStore();
   
   // Get selected node's execution results (if any)
@@ -127,6 +124,7 @@ export function ResultsPage() {
 
     setIsSearching(true);
     setHasSearched(true);
+    setCanvasHasSearched(true);
     try {
       const resp = await searchByText(q, { topK: 50 });
       const mapped: SearchResult[] = (resp.results || []).map((r: any, idx: number) => {
@@ -175,7 +173,7 @@ export function ResultsPage() {
     } finally {
       setIsSearching(false);
     }
-  }, [setIsSearching, setHasSearched, setSearchResults, setStoreQuery]);
+  }, [setIsSearching, setHasSearched, setSearchResults, setStoreQuery, setCanvasHasSearched]);
 
   // If URL provides a query (e.g. /results?q=...), run a text search on load.
   useEffect(() => {
@@ -223,15 +221,13 @@ export function ResultsPage() {
   }, [searchResults, filters]);
 
   const handleFilterChange = useCallback((category: 'typology' | 'climate', value: string, checked: boolean) => {
-    setFilters((prev) => {
-      const current = prev[category];
-      if (checked) {
-        return { ...prev, [category]: [...current, value] };
-      } else {
-        return { ...prev, [category]: current.filter((v) => v !== value) };
-      }
-    });
-  }, []);
+    const current = filters[category];
+    if (checked) {
+      setFilters({ ...filters, [category]: [...current, value] });
+    } else {
+      setFilters({ ...filters, [category]: current.filter((v) => v !== value) });
+    }
+  }, [filters, setFilters]);
 
   const handleDragStart = useCallback((e: React.DragEvent, project: SearchResult) => {
     e.dataTransfer.setData('application/archipedia-precedent', JSON.stringify(project));
@@ -647,7 +643,7 @@ export function ResultsPage() {
                       // Normalize
                       const total = newWeights.visual + newWeights.spatial + newWeights.attribute;
                       if (total > 0) {
-                        setFusionWeights({
+                        setCanvasFusionWeights({
                           visual: Math.round((newWeights.visual / total) * 100),
                           spatial: Math.round((newWeights.spatial / total) * 100),
                           attribute: Math.round((newWeights.attribute / total) * 100),

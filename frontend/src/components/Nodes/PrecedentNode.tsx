@@ -220,12 +220,12 @@ export const PrecedentNode: React.FC<PrecedentNodeProps> = ({ data, selected, id
           <>
             {/* Project Image Container */}
             <div
-              onDoubleClick={(e) => {
+              onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 // Open project detail page in new tab
                 const projectId = currentProject.id || currentProject.title || 'unknown';
-                console.log('[DEBUG] Double-click opening project:', projectId);
+                console.log('[DEBUG] Click opening project:', projectId);
                 window.open(`/project/${encodeURIComponent(projectId)}`, '_blank');
               }}
               style={{
