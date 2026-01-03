@@ -207,18 +207,15 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [] }
           minZoom={0.1}
           maxZoom={2}
           attributionPosition="bottom-left"
-          panOnDrag={[1]} // Pan with middle mouse button (industry standard: middle click = pan)
-          panOnScroll={false} // Don't pan with scroll wheel (industry standard: scroll = zoom)
-          zoomOnScroll={true} // Zoom with scroll wheel (industry standard)
-          selectionOnDrag={true} // Box selection with left mouse button drag on empty space
-          selectNodesOnDrag={false} // Don't select nodes when dragging them
-          panOnSpace={true} // Pan with spacebar + drag (industry standard)
-          nodesDraggable={true} // Allow node dragging with left mouse button
-          nodesConnectable={true} // Allow connecting nodes
-          elementsSelectable={true} // Allow selecting elements
-          connectionLineType="smoothstep" // Smooth connection lines
-          snapToGrid={false} // No grid snapping (can be enabled if needed)
-          snapGrid={[20, 20]} // Grid size if snapping is enabled
+          panOnDrag={true}
+          panOnScroll={false}
+          zoomOnScroll={true}
+          nodesDraggable={true}
+          nodesConnectable={true}
+          elementsSelectable={true}
+          connectionLineType="smoothstep"
+          snapToGrid={false}
+          snapGrid={[20, 20]}
         >
           <Background color="#E8E4D9" gap={20} />
           <Controls />
