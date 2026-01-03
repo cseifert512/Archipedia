@@ -43,12 +43,12 @@ export const ResultsGridCompact: React.FC<ResultsGridCompactProps> = ({
           key={project.id}
           draggable
           onDragStart={(e) => onDragStart(e, project)}
-          onDoubleClick={(e) => {
+          onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             // Open project detail page in new tab
             const projectId = project.id || project.name || 'unknown';
-            console.log('[DEBUG] Double-click opening project:', projectId);
+            console.log('[DEBUG] Click opening project:', projectId);
             window.open(`/project/${encodeURIComponent(projectId)}`, '_blank');
           }}
           className="group"
