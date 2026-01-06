@@ -42,6 +42,9 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
   };
 
   const getStatusBorderColor = () => {
+    if (selected) {
+      return '#FF0000'; // Red border when selected
+    }
     switch (executionStatus) {
       case 'running':
         return '#2196F3';
@@ -50,7 +53,7 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
       case 'error':
         return '#F44336';
       default:
-        return selected ? nodeDef.color : borderColor;
+        return nodeDef.color;
     }
   };
 
@@ -102,6 +105,41 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
         </div>
       </div>
 
+      {/* Port Indicator Bar */}
+      <div
+        style={{
+          borderTop: `1px solid rgba(0,0,0,0.1)`,
+          borderBottom: `1px solid rgba(0,0,0,0.1)`,
+          padding: '8px 16px',
+          backgroundColor: 'rgba(255, 255, 255, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '11px',
+          color: '#666',
+          fontFamily: 'var(--font-secondary)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+          <span style={{ fontSize: '14px' }}>◐</span>
+          <span style={{ fontWeight: 500 }}>INPUT:</span>
+          {inputPorts.length > 0 ? (
+            <span>{inputPorts.map(p => p.type).join(', ')}</span>
+          ) : (
+            <span style={{ color: '#999' }}>None</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'flex-end' }}>
+          <span style={{ fontWeight: 500 }}>OUTPUT:</span>
+          {outputPorts.length > 0 ? (
+            <span>{outputPorts.map(p => p.type).join(', ')}</span>
+          ) : (
+            <span style={{ color: '#999' }}>None</span>
+          )}
+          <span style={{ fontSize: '14px' }}>◑</span>
+        </div>
+      </div>
+
       {/* Content Area */}
       <div style={{ padding: '16px' }}>
         {children}
@@ -109,63 +147,171 @@ export const BaseNode: React.FC<BaseNodeProps> = ({
 
       {/* Input Handles */}
       {inputPorts.length === 0 ? (
-        <Handle
-          type="target"
-          position={Position.Left}
+        <div
           style={{
-            width: '12px',
-            height: '12px',
-            background: getStatusBorderColor(),
-            border: '2px solid white',
+            position: 'absolute',
+            left: '-20px',
             top: '50%',
+            transform: 'translateY(-50%)',
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'auto',
+            zIndex: 10,
           }}
-        />
-      ) : (
-        inputPorts.map((input, index) => (
+        >
           <Handle
-            key={input.id}
             type="target"
             position={Position.Left}
-            id={input.id}
             style={{
-              width: '10px',
-              height: '10px',
-              background: getStatusBorderColor(),
-              border: '2px solid white',
-              top: `${60 + index * 30}px`,
+              width: '40px',
+              height: '40px',
+              background: 'transparent',
+              border: 'none',
+              position: 'relative',
             }}
           />
+          <div
+            style={{
+              width: '12px',
+              height: '12px',
+              background: getStatusBorderColor(),
+              border: '2px solid white',
+              borderRadius: '50%',
+              position: 'absolute',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
+      ) : (
+        inputPorts.map((input, index) => (
+          <div
+            key={input.id}
+            style={{
+              position: 'absolute',
+              left: '-20px',
+              top: `${60 + index * 30}px`,
+              transform: 'translateY(-50%)',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'auto',
+              zIndex: 10,
+            }}
+          >
+            <Handle
+              type="target"
+              position={Position.Left}
+              id={input.id}
+              style={{
+                width: '40px',
+                height: '40px',
+                background: 'transparent',
+                border: 'none',
+                position: 'relative',
+              }}
+            />
+            <div
+              style={{
+                width: '12px',
+                height: '12px',
+                background: getStatusBorderColor(),
+                border: '2px solid white',
+                borderRadius: '50%',
+                position: 'absolute',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
         ))
       )}
 
       {/* Output Handles */}
       {outputPorts.length === 0 ? (
-        <Handle
-          type="source"
-          position={Position.Right}
+        <div
           style={{
-            width: '12px',
-            height: '12px',
-            background: getStatusBorderColor(),
-            border: '2px solid white',
+            position: 'absolute',
+            right: '-20px',
             top: '50%',
+            transform: 'translateY(-50%)',
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'auto',
+            zIndex: 10,
           }}
-        />
-      ) : (
-        outputPorts.map((output, index) => (
+        >
           <Handle
-            key={output.id}
             type="source"
             position={Position.Right}
-            id={output.id}
             style={{
-              width: '10px',
-              height: '10px',
-              background: getStatusBorderColor(),
-              border: '2px solid white',
-              top: `${60 + index * 30}px`,
+              width: '40px',
+              height: '40px',
+              background: 'transparent',
+              border: 'none',
+              position: 'relative',
             }}
           />
+          <div
+            style={{
+              width: '12px',
+              height: '12px',
+              background: getStatusBorderColor(),
+              border: '2px solid white',
+              borderRadius: '50%',
+              position: 'absolute',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
+      ) : (
+        outputPorts.map((output, index) => (
+          <div
+            key={output.id}
+            style={{
+              position: 'absolute',
+              right: '-20px',
+              top: `${60 + index * 30}px`,
+              transform: 'translateY(-50%)',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'auto',
+              zIndex: 10,
+            }}
+          >
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={output.id}
+              style={{
+                width: '40px',
+                height: '40px',
+                background: 'transparent',
+                border: 'none',
+                position: 'relative',
+              }}
+            />
+            <div
+              style={{
+                width: '12px',
+                height: '12px',
+                background: getStatusBorderColor(),
+                border: '2px solid white',
+                borderRadius: '50%',
+                position: 'absolute',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
         ))
       )}
 

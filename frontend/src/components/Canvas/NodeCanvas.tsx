@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -7,6 +7,9 @@ import ReactFlow, {
   Connection,
   Node,
   NodeMouseHandler,
+  ReactFlowInstance,
+  Edge,
+  EdgeMouseHandler,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useCanvasStore } from '../../stores/canvasStore';
@@ -18,12 +21,27 @@ import { ScalarNode } from '../Nodes/ScalarNode';
 import { OperatorANDNode } from '../Nodes/OperatorANDNode';
 import { OperatorORNode } from '../Nodes/OperatorORNode';
 import { OperatorNOTNode } from '../Nodes/OperatorNOTNode';
+import { ResultsNode } from '../Nodes/ResultsNode';
 import { ChildNodeGroup } from './ChildNodeGroup';
 import { NodeData, ParameterMatrix, PrecedentProject } from '../../types/nodes';
 import { MultiplyOutputsDialog } from '../Dialogs/MultiplyOutputsDialog';
 import { calculateGridPosition, calculateHorizontalLayout, calculateVerticalLayout } from '../../lib/layoutAlgorithms';
-import { createNode, createPrecedentNode } from '../../lib/nodeFactory';
+import { 
+  createNode, 
+  createPrecedentNode,
+  createTextNode,
+  createImageNode,
+  createAttributeFilterNode,
+  createScalarNode,
+  createResultsNode,
+  createOperatorANDNode,
+  createOperatorORNode,
+  createOperatorNOTNode,
+} from '../../lib/nodeFactory';
 import { SearchResult } from '../../stores/searchStore';
+import { SelectionContextMenu } from '../ContextMenu/SelectionContextMenu';
+import { TemplatesDialog } from '../Dialogs/TemplatesDialog';
+import { CustomSelectionBox } from './CustomSelectionBox';
 
 const nodeTypes: NodeTypes = {
   precedent: PrecedentNode,
@@ -34,16 +52,32 @@ const nodeTypes: NodeTypes = {
   operatorAND: OperatorANDNode,
   operatorOR: OperatorORNode,
   operatorNOT: OperatorNOTNode,
+  results: ResultsNode,
   default: TextNode,
 };
 
 interface NodeCanvasProps {
   initialPrecedents?: SearchResult[];
+  onOpenTemplates?: () => void;
 }
 
-export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [] }) => {
+export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [], onOpenTemplates }) => {
   const [showMultiplyDialog, setShowMultiplyDialog] = useState(false);
   const [selectedNodeForMultiply, setSelectedNodeForMultiply] = useState<Node<NodeData> | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
+
+  // Expose templates dialog to parent
+  useEffect(() => {
+    if (onOpenTemplates) {
+      // Store the open function in a way parent can call it
+      (window as any).__openTemplates = () => setShowTemplatesDialog(true);
+    }
+  }, [onOpenTemplates]);
+  const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
   const {
     nodes,
     edges,
@@ -51,6 +85,10 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [] }
     onEdgesChange,
     onConnect,
     addNodes,
+    deleteNode,
+    selectedNodes,
+    groupNodes,
+    ungroupNodes,
   } = useCanvasStore();
 
   // Convert search results to precedent nodes on mount
@@ -80,10 +118,152 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [] }
 
   const handleConnect = useCallback(
     (connection: Connection) => {
-      onConnect(connection);
+      // Only connect if we're still in connecting state (Esc not pressed)
+      if (isConnecting) {
+        onConnect(connection);
+      }
+      setIsConnecting(false);
     },
-    [onConnect]
+    [onConnect, isConnecting]
   );
+
+  const handleConnectStart = useCallback(() => {
+    setIsConnecting(true);
+  }, []);
+
+  const handleConnectEnd = useCallback(() => {
+    setIsConnecting(false);
+  }, []);
+
+  // Handle Esc key to cancel connection/unselect nodes and Delete/Backspace to delete edges/nodes
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (isConnecting) {
+          event.preventDefault();
+          setIsConnecting(false);
+        } else if (selectedNodes.length > 0) {
+          // Unselect all nodes
+          event.preventDefault();
+          onNodesChange(selectedNodes.map(nodeId => ({ type: 'select', id: nodeId, selected: false })));
+        } else if (selectedEdgeId) {
+          // Unselect edge
+          event.preventDefault();
+          setSelectedEdgeId(null);
+        }
+      } else if ((event.key === 'Backspace' || event.key === 'Delete')) {
+        // Prioritize deleting selected nodes over edges
+        if (selectedNodes.length > 0) {
+          event.preventDefault();
+          selectedNodes.forEach(nodeId => {
+            deleteNode(nodeId);
+          });
+        } else if (selectedEdgeId) {
+          // Delete selected edge
+          event.preventDefault();
+          const edgeToRemove = edges.find(e => {
+            const edgeId = e.id || `${e.source}-${e.sourceHandle || ''}-${e.target}-${e.targetHandle || ''}`;
+            return edgeId === selectedEdgeId;
+          });
+          if (edgeToRemove) {
+            onEdgesChange([{ type: 'remove', id: edgeToRemove.id || selectedEdgeId }]);
+            setSelectedEdgeId(null);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isConnecting, selectedEdgeId, selectedNodes, edges, onEdgesChange, onNodesChange, deleteNode]);
+
+  const handleEdgeMouseEnter: EdgeMouseHandler = useCallback((event, edge) => {
+    const edgeId = edge.id || `${edge.source}-${edge.sourceHandle || ''}-${edge.target}-${edge.targetHandle || ''}`;
+    setHoveredEdgeId(edgeId);
+  }, []);
+
+  const handleEdgeMouseLeave: EdgeMouseHandler = useCallback(() => {
+    setHoveredEdgeId(null);
+  }, []);
+
+  const handleEdgeClick: EdgeMouseHandler = useCallback((event, edge) => {
+    event.stopPropagation();
+    const edgeId = edge.id || `${edge.source}-${edge.sourceHandle || ''}-${edge.target}-${edge.targetHandle || ''}`;
+    setSelectedEdgeId(edgeId === selectedEdgeId ? null : edgeId);
+  }, [selectedEdgeId]);
+
+  const handlePaneClick = useCallback(() => {
+    // Deselect edge when clicking on empty canvas
+    setSelectedEdgeId(null);
+    setContextMenu(null);
+  }, []);
+
+  const handlePaneContextMenu = useCallback((event: React.MouseEvent) => {
+    // Only show context menu if multiple nodes are selected
+    if (selectedNodes.length >= 2) {
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY });
+    }
+  }, [selectedNodes.length]);
+
+  const handleGroupNodes = useCallback(() => {
+    if (selectedNodes.length >= 2) {
+      groupNodes(selectedNodes);
+      setContextMenu(null);
+    }
+  }, [selectedNodes, groupNodes]);
+
+  const handleUngroupNodes = useCallback(() => {
+    if (selectedNodes.length > 0) {
+      // Find the group ID of the first selected node
+      const firstNode = nodes.find(n => selectedNodes.includes(n.id));
+      if (firstNode && (firstNode.data as any).groupId) {
+        const groupId = (firstNode.data as any).groupId;
+        ungroupNodes(groupId);
+        setContextMenu(null);
+      }
+    }
+  }, [selectedNodes, nodes, ungroupNodes]);
+
+  // Check if all selected nodes are in the same group
+  const canUngroup = useMemo(() => {
+    if (selectedNodes.length === 0) return false;
+    const selectedNodeData = nodes
+      .filter(n => selectedNodes.includes(n.id))
+      .map(n => (n.data as any).groupId);
+    if (selectedNodeData.length === 0) return false;
+    const firstGroupId = selectedNodeData[0];
+    return firstGroupId && selectedNodeData.every(g => g === firstGroupId);
+  }, [selectedNodes, nodes]);
+
+  const handleSaveWorkflow = useCallback(() => {
+    // Open templates dialog in save mode
+    setShowTemplatesDialog(true);
+    setContextMenu(null);
+  }, []);
+
+  const handleLoadTemplate = useCallback((template: { nodes: Node<NodeData>[]; edges: Edge[] }) => {
+    // Clear current canvas and load template
+    const newNodes = template.nodes.map(node => ({
+      ...node,
+      position: {
+        x: node.position.x + 100, // Offset slightly
+        y: node.position.y + 100,
+      },
+    }));
+    addNodes(newNodes);
+      // Add edges
+      template.edges.forEach(edge => {
+        onConnect({
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.sourceHandle || null,
+          targetHandle: edge.targetHandle || null,
+        });
+      });
+  }, [addNodes, onConnect]);
 
   const handleNodeContextMenu: NodeMouseHandler = useCallback((event, node) => {
     event.preventDefault();
@@ -91,38 +271,175 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [] }
     setShowMultiplyDialog(true);
   }, []);
 
-  const handleDrop = useCallback(
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  // Calculate selection box bounds for multi-select
+  const selectionBox = useMemo(() => {
+    if (selectedNodes.length < 2 || !reactFlowInstance) return null;
+    
+    const selectedNodeObjects = nodes.filter(n => selectedNodes.includes(n.id));
+    if (selectedNodeObjects.length === 0) return null;
+
+    // Calculate bounding box
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    selectedNodeObjects.forEach(node => {
+      const position = node.position;
+      const width = (node.width as number) || 300;
+      const height = (node.height as number) || 200;
+      
+      minX = Math.min(minX, position.x);
+      minY = Math.min(minY, position.y);
+      maxX = Math.max(maxX, position.x + width);
+      maxY = Math.max(maxY, position.y + height);
+    });
+
+    // Convert to screen coordinates
+    const screenMin = reactFlowInstance.project({ x: minX, y: minY });
+    const screenMax = reactFlowInstance.project({ x: maxX, y: maxY });
+
+    return {
+      x: screenMin.x,
+      y: screenMin.y,
+      width: screenMax.x - screenMin.x,
+      height: screenMax.y - screenMin.y,
+    };
+  }, [selectedNodes, nodes, reactFlowInstance]);
+
+  // Handle middle mouse button panning
+  useEffect(() => {
+    if (!reactFlowInstance) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        setIsPanning(true);
+        setPanStart({ x: e.clientX, y: e.clientY });
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isPanning && reactFlowInstance) {
+        e.preventDefault();
+        const deltaX = e.clientX - panStart.x;
+        const deltaY = e.clientY - panStart.y;
+        const viewport = reactFlowInstance.getViewport();
+        reactFlowInstance.setViewport({ ...viewport, x: viewport.x + deltaX, y: viewport.y + deltaY });
+        setPanStart({ x: e.clientX, y: e.clientY });
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 1) {
+        setIsPanning(false);
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('contextmenu', handleContextMenu);
+
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [reactFlowInstance, isPanning, panStart]);
+
+  const handlePaneDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-      const data = event.dataTransfer.getData('application/archipedia-precedent');
-      if (data) {
-        try {
-          const project: SearchResult = JSON.parse(data);
-          const reactFlowBounds = (event.target as HTMLElement).getBoundingClientRect();
-          const position = {
-            x: event.clientX - reactFlowBounds.left,
-            y: event.clientY - reactFlowBounds.top,
-          };
+      
+      // Try to get precedent data first
+      let data = event.dataTransfer.getData('application/archipedia-precedent');
+      let nodeType = 'precedent';
+      
+      // If no precedent data, try other node types
+      if (!data) {
+        data = event.dataTransfer.getData('application/archipedia-node-type');
+        if (data) {
+          nodeType = data;
+        } else {
+          // If no recognized data, don't create a node
+          return;
+        }
+      }
 
-          const precedentProject: PrecedentProject = {
-            id: project.id,
-            title: project.name,
-            thumbnail: project.imageUrl || project.url || '',
-            attributes: {
-              circulation: project.typology || '',
-              materiality: Array.isArray(project.materials) ? project.materials.join('+') : (project.materials || ''),
-              climate: Array.isArray(project.climate) ? project.climate.join('+') : (typeof project.climate === 'string' ? project.climate : ''),
-            },
-          };
+      if (reactFlowInstance) {
+        const position = reactFlowInstance.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
 
-          const newNode = createPrecedentNode(position, [precedentProject]);
-          addNodes([newNode]);
-        } catch (error) {
-          console.error('Error parsing dropped data:', error);
+        if (nodeType === 'precedent' && data) {
+          try {
+            const project: SearchResult = JSON.parse(data);
+            const precedentProject: PrecedentProject = {
+              id: project.id,
+              title: project.name,
+              thumbnail: project.imageUrl || project.url || '',
+              attributes: {
+                circulation: project.typology || '',
+                materiality: Array.isArray(project.materials) ? project.materials.join('+') : (project.materials || ''),
+                climate: Array.isArray(project.climate) ? project.climate.join('+') : (typeof project.climate === 'string' ? project.climate : ''),
+              },
+            };
+
+            const newNode = createPrecedentNode(position, [precedentProject]);
+            console.log('[NodeCanvas] Creating precedent node:', newNode.type, newNode.data.type);
+            addNodes([newNode]);
+          } catch (error) {
+            console.error('Error parsing dropped data:', error);
+          }
+        } else if (['text', 'image', 'attributeFilter', 'scalar', 'results', 'operatorAND', 'operatorOR', 'operatorNOT'].includes(nodeType)) {
+          // Handle other node types
+          let newNode: Node<NodeData> | null = null;
+          
+          switch (nodeType) {
+            case 'text':
+              newNode = createTextNode(position, '');
+              break;
+            case 'image':
+              newNode = createImageNode(position);
+              break;
+            case 'attributeFilter':
+              newNode = createAttributeFilterNode(position);
+              break;
+            case 'scalar':
+              newNode = createScalarNode(position);
+              break;
+            case 'results':
+              newNode = createResultsNode(position, 0);
+              break;
+            case 'operatorAND':
+              newNode = createOperatorANDNode(position);
+              break;
+            case 'operatorOR':
+              newNode = createOperatorORNode(position);
+              break;
+            case 'operatorNOT':
+              newNode = createOperatorNOTNode(position);
+              break;
+          }
+          
+          if (newNode) {
+            console.log('[NodeCanvas] Creating node:', nodeType, newNode.type, newNode.data.type);
+            addNodes([newNode]);
+          }
         }
       }
     },
-    [addNodes]
+    [addNodes, reactFlowInstance]
   );
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
@@ -174,6 +491,28 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [] }
     [selectedNodeForMultiply, addNodes]
   );
 
+  // Custom edge styles based on hover and selection
+  const styledEdges = useMemo(() => {
+    return edges.map((edge) => {
+      const edgeId = edge.id || `${edge.source}-${edge.sourceHandle || ''}-${edge.target}-${edge.targetHandle || ''}`;
+      const isHovered = hoveredEdgeId === edgeId;
+      const isSelected = selectedEdgeId === edgeId;
+      const strokeColor = isSelected || isHovered ? '#FF0000' : '#CCCCCC';
+      const strokeWidth = isSelected ? 3 : isHovered ? 2.5 : 2;
+
+      return {
+        ...edge,
+        id: edgeId,
+        style: {
+          ...edge.style,
+          stroke: strokeColor,
+          strokeWidth,
+        },
+        selected: isSelected,
+      };
+    });
+  }, [edges, hoveredEdgeId, selectedEdgeId]);
+
   const defaultEdgeOptions = useMemo(
     () => ({
       style: { strokeWidth: 2, stroke: '#CCCCCC' },
@@ -186,21 +525,41 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [] }
   return (
     <>
       <div
+        ref={reactFlowWrapperRef}
         style={{
           width: '100%',
           height: '100%',
           backgroundColor: '#F5F1E8',
         }}
-        onDrop={handleDrop}
         onDragOver={handleDragOver}
+        onDrop={handlePaneDrop}
       >
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={nodes.map(node => {
+            const nodeData = node.data as any;
+            const isGrouped = !!nodeData.groupId;
+            // Grouped nodes can be dragged, but they'll move together
+            // Selected nodes cannot be dragged (for slider interaction)
+            return {
+              ...node,
+              draggable: !selectedNodes.includes(node.id) && !isGrouped ? true : !selectedNodes.includes(node.id),
+            };
+          })}
+          edges={styledEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={handleConnect}
+          onConnectStart={handleConnectStart}
+          onConnectEnd={handleConnectEnd}
+          onEdgeMouseEnter={handleEdgeMouseEnter}
+          onEdgeMouseLeave={handleEdgeMouseLeave}
+          onEdgeClick={handleEdgeClick}
+          onPaneClick={handlePaneClick}
+          onPaneContextMenu={handlePaneContextMenu}
           onNodeContextMenu={handleNodeContextMenu}
+          selectNodesOnDrag={false}
+          selectionOnDrag={true}
+          onInit={setReactFlowInstance}
           nodeTypes={nodeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
           fitView
@@ -213,7 +572,7 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [] }
           nodesDraggable={true}
           nodesConnectable={true}
           elementsSelectable={true}
-          connectionLineType="smoothstep"
+          connectionLineType={"smoothstep" as any}
           snapToGrid={false}
           snapGrid={[20, 20]}
         >
@@ -253,6 +612,43 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [] }
             setSelectedNodeForMultiply(null);
           }}
           onConfirm={handleMultiplyConfirm}
+        />
+      )}
+
+      {selectionBox && selectedNodes.length >= 2 && (
+        <CustomSelectionBox
+          x={selectionBox.x}
+          y={selectionBox.y}
+          width={selectionBox.width}
+          height={selectionBox.height}
+          onGroup={handleGroupNodes}
+          onUngroup={canUngroup ? handleUngroupNodes : undefined}
+          onSaveWorkflow={handleSaveWorkflow}
+          selectedCount={selectedNodes.length}
+          canUngroup={canUngroup}
+        />
+      )}
+
+      {contextMenu && selectedNodes.length >= 2 && (
+        <SelectionContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onGroup={handleGroupNodes}
+          onUngroup={canUngroup ? handleUngroupNodes : undefined}
+          onSaveWorkflow={handleSaveWorkflow}
+          selectedCount={selectedNodes.length}
+          canUngroup={canUngroup}
+        />
+      )}
+
+      {showTemplatesDialog && (
+        <TemplatesDialog
+          open={showTemplatesDialog}
+          onClose={() => setShowTemplatesDialog(false)}
+          onLoadTemplate={handleLoadTemplate}
+          currentNodes={nodes}
+          currentEdges={edges}
         />
       )}
     </>

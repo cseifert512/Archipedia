@@ -8,6 +8,7 @@ import {
   ReferenceBlock,
   TextBlock,
   DividerBlock,
+  FrameBlock,
   LayoutPreset,
 } from '../stores/boardStore';
 import { ImageReplacer as ImageReplacerModal, ExportMenu } from '../components/Boards';
@@ -27,6 +28,7 @@ import {
   Trash2,
   Star,
   Edit2,
+  Square,
 } from 'lucide-react';
 
 export function BoardEditPage() {
@@ -41,6 +43,7 @@ export function BoardEditPage() {
   const updateBlockCaption = useBoardStore((state) => state.updateBlockCaption);
   const addTextBlock = useBoardStore((state) => state.addTextBlock);
   const addDividerBlock = useBoardStore((state) => state.addDividerBlock);
+  const addFrameBlock = useBoardStore((state) => state.addFrameBlock);
   const lastSaved = useBoardStore((state) => state.lastSaved);
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -82,6 +85,14 @@ export function BoardEditPage() {
       setShowAddMenu(null);
     },
     [boardId, addDividerBlock]
+  );
+
+  const handleAddFrame = useCallback(
+    (afterBlockId: string | undefined) => {
+      addFrameBlock(boardId, 'New Slide', afterBlockId);
+      setShowAddMenu(null);
+    },
+    [boardId, addFrameBlock]
   );
 
   if (!board) {
@@ -394,6 +405,7 @@ export function BoardEditPage() {
                     showAddMenu={showAddMenu === block.id}
                     onAddText={(style) => handleAddTextBlock(block.id, style)}
                     onAddDivider={() => handleAddDivider(block.id)}
+                    onAddFrame={() => handleAddFrame(block.id)}
                     onCloseAddMenu={() => setShowAddMenu(null)}
                   />
                 ))}
@@ -427,6 +439,7 @@ export function BoardEditPage() {
                     <AddBlockMenu
                       onAddText={(style) => handleAddTextBlock(undefined, style)}
                       onAddDivider={() => handleAddDivider(undefined)}
+                      onAddFrame={() => handleAddFrame(undefined)}
                       onClose={() => setShowAddMenu(null)}
                     />
                   )}
@@ -633,6 +646,7 @@ interface EditableBlockProps {
   showAddMenu: boolean;
   onAddText: (style: 'h2' | 'body') => void;
   onAddDivider: () => void;
+  onAddFrame: () => void;
   onCloseAddMenu: () => void;
 }
 
@@ -723,6 +737,13 @@ function EditableBlock({
         />
       )}
       {block.type === 'divider' && <DividerBlockEditor block={block} />}
+      {block.type === 'frame' && (
+        <FrameBlockEditor
+          block={block}
+          boardId={boardId}
+          onUpdate={(updates) => updateBlock(boardId, block.id, updates)}
+        />
+      )}
 
       {/* Add Block Button (between blocks) */}
       {isHovered && (
@@ -756,6 +777,7 @@ function EditableBlock({
             <AddBlockMenu
               onAddText={onAddText}
               onAddDivider={onAddDivider}
+              onAddFrame={onAddFrame}
               onClose={onCloseAddMenu}
             />
           )}
@@ -1020,15 +1042,88 @@ function DividerBlockEditor({ block }: { block: DividerBlock }) {
   );
 }
 
+// ============ Frame Block Editor ============
+
+function FrameBlockEditor({
+  block,
+  boardId,
+  onUpdate,
+}: {
+  block: FrameBlock;
+  boardId: string;
+  onUpdate: (updates: Partial<FrameBlock['data']>) => void;
+}) {
+  const { data } = block;
+  const [titleValue, setTitleValue] = useState(data.title || 'New Slide');
+
+  useEffect(() => {
+    setTitleValue(data.title || 'New Slide');
+  }, [data.title]);
+
+  const handleTitleBlur = () => {
+    if (titleValue !== data.title) {
+      onUpdate({ title: titleValue });
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: '24px',
+        backgroundColor: 'rgba(182, 68, 36, 0.05)',
+        border: '2px dashed var(--accent)',
+        borderRadius: '12px',
+        borderLeft: '4px solid var(--accent)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+        <Square size={20} style={{ color: 'var(--accent)' }} />
+        <input
+          type="text"
+          value={titleValue}
+          onChange={(e) => setTitleValue(e.target.value)}
+          onBlur={handleTitleBlur}
+          onKeyDown={(e) => e.key === 'Enter' && handleTitleBlur()}
+          placeholder="Slide title..."
+          style={{
+            flex: 1,
+            fontFamily: 'var(--font-primary)',
+            fontSize: '18px',
+            fontWeight: 600,
+            border: 'none',
+            borderBottom: '2px solid var(--accent)',
+            outline: 'none',
+            padding: '4px 0',
+            backgroundColor: 'transparent',
+          }}
+        />
+      </div>
+      <p
+        style={{
+          fontFamily: 'var(--font-secondary)',
+          fontSize: '12px',
+          color: 'rgba(0,0,0,0.5)',
+          margin: 0,
+          fontStyle: 'italic',
+        }}
+      >
+        This frame starts a new slide in PDF export. All blocks below belong to this slide until the next frame.
+      </p>
+    </div>
+  );
+}
+
 // ============ Add Block Menu ============
 
 function AddBlockMenu({
   onAddText,
   onAddDivider,
+  onAddFrame,
   onClose,
 }: {
   onAddText: (style: 'h2' | 'body') => void;
   onAddDivider: () => void;
+  onAddFrame: () => void;
   onClose: () => void;
 }) {
   return (
@@ -1122,6 +1217,28 @@ function AddBlockMenu({
         >
           <Minus size={16} />
           Divider
+        </button>
+        <button
+          onClick={onAddFrame}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            width: '100%',
+            padding: '10px 12px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-secondary)',
+            fontSize: '13px',
+            textAlign: 'left',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+        >
+          <Square size={16} />
+          Frame (New Slide)
         </button>
       </div>
     </>

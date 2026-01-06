@@ -44,17 +44,46 @@ export const OperatorNOTNode: React.FC<OperatorNOTNodeProps> = ({
     setOutputCount(Math.max(0, includeCount - excludeCount));
   };
 
-  // Calculate positions for connection handles based on expanded state
-  const includeHandleY = isExpanded ? 180 : 40;
-  const excludeHandleY = isExpanded ? 250 : 60;
-  const outputHandleY = isExpanded ? 450 : 40;
+  // Calculate positions for connection handles aligned with text labels
+  const headerHeight = isExpanded ? 48 : 32;
+  const currentMinHeight = isExpanded 
+    ? Math.max(500, headerHeight + 100 + 2 * 60) // 2 inputs
+    : Math.max(80, headerHeight + 20 + 2 * 20);
+  
+  let includeHandleY: number;
+  let excludeHandleY: number;
+  let outputHandleY: number;
+  
+  if (isExpanded) {
+    // Expanded view: align with INCLUDE, EXCLUDE, and OUTPUT text labels
+    const contentPadding = 16;
+    const includeSectionTop = headerHeight + contentPadding + 8; // Header + padding + margin to INCLUDE label
+    includeHandleY = includeSectionTop + 10; // Aligned with "INCLUDE (source results):" text
+    
+    const excludeSectionTop = includeSectionTop + 60; // After INCLUDE section
+    excludeHandleY = excludeSectionTop + 10; // Aligned with "EXCLUDE (negative examples):" text
+    
+    // OUTPUT section is near the bottom, align with "OUTPUT: Filtered Results" text
+    const outputSectionTop = currentMinHeight - 80; // Approximate position of OUTPUT section
+    outputHandleY = outputSectionTop + 10; // Aligned with "OUTPUT:" text
+  } else {
+    // Collapsed view: center inputs
+    const contentStartY = headerHeight;
+    const contentHeight = currentMinHeight - headerHeight;
+    const contentCenterY = contentStartY + contentHeight / 2;
+    const inputSpacing = 20;
+    
+    includeHandleY = contentCenterY - (inputSpacing / 2);
+    excludeHandleY = contentCenterY + (inputSpacing / 2);
+    outputHandleY = contentCenterY;
+  }
 
   return (
     <div
       className="rounded-lg overflow-visible cursor-move group transition-all"
       style={{
-        width: isExpanded ? '400px' : '120px',
-        minHeight: isExpanded ? '500px' : '80px',
+        width: isExpanded ? '400px' : '180px',
+        minHeight: currentMinHeight,
         backgroundColor: '#FFFFFF',
         border: selected ? '2px solid #FF6B6B' : '1px solid rgba(0,0,0,0.1)',
         borderRadius: isExpanded ? '12px' : '8px',
@@ -70,55 +99,127 @@ export const OperatorNOTNode: React.FC<OperatorNOTNodeProps> = ({
       }}
     >
       {/* Include Input Handle */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="include"
+      <div
         style={{
-          left: isExpanded ? '-8px' : '-6px',
+          position: 'absolute',
+          left: '-20px',
           top: `${includeHandleY}px`,
-          width: isExpanded ? '16px' : '12px',
-          height: isExpanded ? '16px' : '12px',
-          background: '#32C864',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: isExpanded ? 'inset(0 50% 0 0)' : 'none',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="include"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#32C864',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
 
       {/* Exclude Input Handle */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="exclude"
+      <div
         style={{
-          left: isExpanded ? '-8px' : '-6px',
+          position: 'absolute',
+          left: '-20px',
           top: `${excludeHandleY}px`,
-          width: isExpanded ? '16px' : '12px',
-          height: isExpanded ? '16px' : '12px',
-          background: '#FF6B6B',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: isExpanded ? 'inset(0 50% 0 0)' : 'none',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="exclude"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#FF6B6B',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
 
       {/* Output Handle */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="output"
+      <div
         style={{
-          right: isExpanded ? '-8px' : '-6px',
+          position: 'absolute',
+          right: '-20px',
           top: isExpanded ? `${outputHandleY}px` : '50%',
-          width: isExpanded ? '16px' : '12px',
-          height: isExpanded ? '16px' : '12px',
-          background: '#FF6B6B',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: isExpanded ? 'inset(0 0 0 50%)' : 'none',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="output"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#FF6B6B',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
 
       {/* Header */}
       <div

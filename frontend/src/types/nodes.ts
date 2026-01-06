@@ -12,7 +12,8 @@ export type NodeType =
   | 'scalar'
   | 'operatorAND'
   | 'operatorOR'
-  | 'operatorNOT';
+  | 'operatorNOT'
+  | 'results';
 
 export interface PrecedentProject {
   id: string;
@@ -169,6 +170,12 @@ export interface OperatorNOTNodeData extends BaseNodeData {
   outputResults?: any[];
 }
 
+export interface ResultsNodeData extends BaseNodeData {
+  type: 'results';
+  resultCount?: number;
+  results?: any[];
+}
+
 export type NodeData = 
   | PrecedentNodeData 
   | StackedPrecedentNodeData
@@ -181,7 +188,8 @@ export type NodeData =
   | ScalarNodeData
   | OperatorANDNodeData
   | OperatorORNodeData
-  | OperatorNOTNodeData;
+  | OperatorNOTNodeData
+  | ResultsNodeData;
 
 export interface NodeGraph {
   nodes: Array<{

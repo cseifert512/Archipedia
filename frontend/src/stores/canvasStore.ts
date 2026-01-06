@@ -47,6 +47,7 @@ interface CanvasState {
   nodes: Node<NodeData>[];
   edges: Edge[];
   selectedNodes: string[];
+  nodeGroups: Record<string, string[]>; // groupId -> nodeIds[]
   
   // Actions - tldraw
   setEditor: (editor: any | null) => void;
@@ -59,12 +60,18 @@ interface CanvasState {
   
   // Actions - ReactFlow
   addNodes: (nodes: Node<NodeData>[]) => void;
+  addEdges: (edges: Edge[]) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
   deleteNode: (nodeId: string) => void;
   updateNode: (nodeId: string, data: Record<string, any>) => void;
   setSelectedNodes: (nodeIds: string[]) => void;
+  
+  // Actions - Grouping
+  groupNodes: (nodeIds: string[]) => void;
+  ungroupNodes: (groupId: string) => void;
+  getNodeGroup: (nodeId: string) => string | null;
   
   // Actions - Workflow execution
   executeFromNode: (nodeId: string) => Promise<void>;
@@ -97,6 +104,7 @@ export const useCanvasStore = create<CanvasState>()(
   nodes: [],
   edges: [],
   selectedNodes: [],
+  nodeGroups: {},
 
   setEditor: (editor) => {
     set({ editor });
@@ -285,9 +293,53 @@ export const useCanvasStore = create<CanvasState>()(
     }));
   },
   
+  addEdges: (newEdges) => {
+    console.log('[canvasStore] addEdges called with', newEdges.length, 'edges');
+    set((state) => {
+      // Merge new edges with existing, avoiding duplicates
+      const existingEdgeIds = new Set(state.edges.map(e => e.id));
+      const uniqueNewEdges = newEdges.filter(e => !existingEdgeIds.has(e.id));
+      return {
+        edges: [...state.edges, ...uniqueNewEdges],
+      };
+    });
+  },
+  
   onNodesChange: (changes) => {
     set((state) => {
-      const newNodes = applyNodeChanges(changes, state.nodes) as Node<NodeData>[];
+      let newNodes = applyNodeChanges(changes, state.nodes) as Node<NodeData>[];
+      
+      // Handle grouped node movement - when a grouped node moves, move all nodes in the group
+      const positionChanges = changes.filter(c => c.type === 'position' && c.position);
+      for (const change of positionChanges) {
+        if (change.type === 'position' && change.position) {
+          const changedNode = newNodes.find(n => n.id === change.id);
+          if (changedNode && (changedNode.data as any).groupId) {
+            const groupId = (changedNode.data as any).groupId;
+            const groupNodeIds = state.nodeGroups[groupId] || [];
+            const oldNode = state.nodes.find(n => n.id === change.id);
+            
+            if (oldNode && changedNode.position) {
+              const deltaX = changedNode.position.x - oldNode.position.x;
+              const deltaY = changedNode.position.y - oldNode.position.y;
+              
+              // Move all other nodes in the group by the same delta
+              newNodes = newNodes.map((node) => {
+                if (groupNodeIds.includes(node.id) && node.id !== change.id) {
+                  return {
+                    ...node,
+                    position: {
+                      x: node.position.x + deltaX,
+                      y: node.position.y + deltaY,
+                    },
+                  };
+                }
+                return node;
+              });
+            }
+          }
+        }
+      }
       
       // Track selected nodes in the same update
       const selectedIds = newNodes
@@ -344,6 +396,65 @@ export const useCanvasStore = create<CanvasState>()(
   
   setSelectedNodes: (nodeIds) => {
     set({ selectedNodes: nodeIds });
+  },
+  
+  // Grouping
+  groupNodes: (nodeIds) => {
+    if (nodeIds.length < 2) return;
+    
+    const groupId = `group-${Date.now()}`;
+    set((state) => ({
+      nodeGroups: {
+        ...state.nodeGroups,
+        [groupId]: nodeIds,
+      },
+      nodes: state.nodes.map((node) => {
+        if (nodeIds.includes(node.id)) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              groupId,
+            },
+            // Keep draggable but we'll handle group movement in onNodesChange
+          };
+        }
+        return node;
+      }),
+    }));
+  },
+  
+  ungroupNodes: (groupId) => {
+    set((state) => {
+      const nodeIds = state.nodeGroups[groupId] || [];
+      const newGroups = { ...state.nodeGroups };
+      delete newGroups[groupId];
+      
+      return {
+        nodeGroups: newGroups,
+        nodes: state.nodes.map((node) => {
+          if (nodeIds.includes(node.id)) {
+            const { groupId: _, ...dataWithoutGroup } = node.data as any;
+            return {
+              ...node,
+              data: dataWithoutGroup,
+              draggable: !state.selectedNodes.includes(node.id), // Restore draggability based on selection
+            };
+          }
+          return node;
+        }),
+      };
+    });
+  },
+  
+  getNodeGroup: (nodeId) => {
+    const state = get();
+    for (const [groupId, nodeIds] of Object.entries(state.nodeGroups)) {
+      if (nodeIds.includes(nodeId)) {
+        return groupId;
+      }
+    }
+    return null;
   },
   
   // Workflow execution
@@ -556,9 +667,10 @@ export const useCanvasStore = create<CanvasState>()(
       storage: createJSONStorage(() => sessionStorage),
       // Only persist ReactFlow state (nodes, edges) - exclude non-serializable values
       partialize: (state) => ({
-        nodes: state.nodes,
-        edges: state.edges,
-        selectedNodes: state.selectedNodes,
+      nodes: state.nodes,
+      edges: state.edges,
+      selectedNodes: state.selectedNodes,
+      nodeGroups: state.nodeGroups,
       }),
     }
   )

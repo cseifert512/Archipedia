@@ -14,6 +14,7 @@ import {
   createPrecedentNode,
   createAttributeFilterNode, 
   createScalarNode, 
+  createResultsNode,
   createOperatorANDNode, 
   createOperatorORNode, 
   createOperatorNOTNode 
@@ -52,7 +53,7 @@ export function ResultsPage() {
   const setFusionWeights = setCanvasFusionWeights;
 
   const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null);
-  const { nodes, addNodes, executeWorkflow, selectedNodes } = useCanvasStore();
+  const { nodes, edges, addNodes, executeWorkflow, selectedNodes } = useCanvasStore();
   
   // Get selected node's execution results (if any)
   const selectedNode = useMemo(() => {
@@ -253,6 +254,9 @@ export function ResultsPage() {
         break;
       case 'scalar':
         newNode = createScalarNode(position);
+        break;
+      case 'results':
+        newNode = createResultsNode(position, 0);
         break;
       case 'operatorAND':
         newNode = createOperatorANDNode(position);
@@ -455,32 +459,269 @@ export function ResultsPage() {
               style={{
                 position: 'absolute',
                 inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
                 pointerEvents: 'none',
               }}
             >
-              <div style={{ textAlign: 'center' }}>
+              {/* Left Column - Node Descriptions aligned with sidebar buttons */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '220px', // Align with sidebar (180px width + 20px left + 20px gap)
+                  top: '120px', // Match sidebar top
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px', // Match sidebar gap
+                  textAlign: 'left',
+                }}
+              >
+                {/* Box: Node descriptions - each aligned with its button (40px height, 4px gap) */}
                 <div
                   style={{
-                    fontFamily: 'var(--font-primary)',
-                    fontSize: '16px',
-                    fontWeight: 300,
-                    color: 'rgba(0,0,0,0.4)',
-                    marginBottom: '6px',
+                    border: '1px solid rgba(0,0,0,0.15)',
+                    borderRadius: '8px',
+                    padding: '0 12px 12px 12px',
+                    backgroundColor: 'rgba(255,255,255,0.6)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    minHeight: '348px', // Match approximate height: 8 nodes * 40px + 7 gaps * 4px = 348px
+                    width: '280px', // Match width with workflows box
                   }}
                 >
-                  Click node icons to begin
+                  <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '12px',
+                        fontWeight: 300,
+                        color: 'rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      <strong>TEXT</strong> — Search by description or prompt
+                    </div>
+                  </div>
+                  <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '12px',
+                        fontWeight: 300,
+                        color: 'rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      <strong>IMAGE</strong> — Search by visual similarity
+                    </div>
+                  </div>
+                  <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '12px',
+                        fontWeight: 300,
+                        color: 'rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      <strong>ATTRIBUTES</strong> — Filter by typology, climate, etc.
+                    </div>
+                  </div>
+                  <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '12px',
+                        fontWeight: 300,
+                        color: 'rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      <strong>CONSTRAINTS</strong> — Apply scalar filters (area, height, etc.)
+                    </div>
+                  </div>
+                  <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '12px',
+                        fontWeight: 300,
+                        color: 'rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      <strong>RESULTS</strong> — Display search results
+                    </div>
+                  </div>
+                  <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '12px',
+                        fontWeight: 300,
+                        color: 'rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      <strong>AND</strong> — Combine multiple inputs
+                    </div>
+                  </div>
+                  <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '12px',
+                        fontWeight: 300,
+                        color: 'rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      <strong>OR</strong> — Union of multiple inputs
+                    </div>
+                  </div>
+                  <div style={{ height: '40px', display: 'flex', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-primary)',
+                        fontSize: '12px',
+                        fontWeight: 300,
+                        color: 'rgba(0,0,0,0.4)',
+                      }}
+                    >
+                      <strong>NOT</strong> — Exclude similar results
+                    </div>
+                  </div>
                 </div>
+
+                {/* Box: Workflows section - aligned with Workflows button (after 8 nodes + separator) */}
+                <div style={{ marginTop: '12px', paddingTop: '12px' }}>
+                  <div
+                    style={{
+                      border: '1px solid rgba(0,0,0,0.15)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      backgroundColor: 'rgba(255,255,255,0.6)',
+                      minHeight: '60px',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      width: '280px', // Match width with node descriptions box
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-primary)',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          color: 'rgba(0,0,0,0.5)',
+                          marginBottom: '4px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        Workflows
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-primary)',
+                          fontSize: '12px',
+                          fontWeight: 300,
+                          color: 'rgba(0,0,0,0.4)',
+                          lineHeight: '1.5',
+                        }}
+                      >
+                        Save and load workflow templates.
+                        <br />
+                        Click the <strong>WORKFLOWS</strong> button to manage your saved workflows.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - Hero and Navigation */}
+              {/* Hero box - aligned horizontally with Workflows box */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '750px', // Position further to the right, separate from left column
+                  top: '492px', // Align with Workflows section
+                  textAlign: 'left',
+                }}
+              >
                 <div
                   style={{
-                    fontFamily: 'var(--font-primary)',
-                    fontSize: '12px',
-                    color: 'rgba(0,0,0,0.3)',
+                    border: '1px solid rgba(0,0,0,0.15)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    backgroundColor: 'rgba(255,255,255,0.6)',
                   }}
                 >
-                  Add precedents and create stacks
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-primary)',
+                      fontSize: '16px',
+                      fontWeight: 300,
+                      color: 'rgba(0,0,0,0.4)',
+                      marginBottom: '6px',
+                    }}
+                  >
+                    Click node icons to begin
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-primary)',
+                      fontSize: '12px',
+                      color: 'rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    Add precedents and create stacks
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation box - aligned horizontally with Node Types box */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '750px', // Position further to the right, separate from left column
+                  top: '120px', // Align with Node Types section
+                  textAlign: 'left',
+                }}
+              >
+                <div
+                  style={{
+                    border: '1px solid rgba(0,0,0,0.15)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    backgroundColor: 'rgba(255,255,255,0.6)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-primary)',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      color: 'rgba(0,0,0,0.5)',
+                      marginBottom: '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    Navigation
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      fontFamily: 'var(--font-primary)',
+                      fontSize: '12px',
+                      fontWeight: 300,
+                      color: 'rgba(0,0,0,0.4)',
+                    }}
+                  >
+                    <div><strong>Left Click</strong> — Select node or drag to pan canvas</div>
+                    <div><strong>Right Click</strong> — Open context menu</div>
+                    <div><strong>Shift + Left Click</strong> — Multi-select nodes</div>
+                    <div><strong>Drag Handle</strong> — Connect nodes</div>
+                    <div><strong>Scroll</strong> — Zoom in/out</div>
+                    <div><strong>Delete/Backspace</strong> — Remove selected nodes</div>
+                    <div><strong>Esc</strong> — Cancel connection or deselect</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -488,7 +729,22 @@ export function ResultsPage() {
         </div>
 
         {/* Node Palette Sidebar */}
-        <NodePaletteSidebar onAddNode={addNodeToCanvas} />
+        <NodePaletteSidebar 
+          onAddNode={addNodeToCanvas}
+          onOpenTemplates={() => {
+            if ((window as any).__openTemplates) {
+              (window as any).__openTemplates();
+            }
+          }}
+          onLoadTemplate={(template) => {
+            // Handle template loading
+            if ((window as any).__loadTemplate) {
+              (window as any).__loadTemplate(template);
+            }
+          }}
+          currentNodes={nodes}
+          currentEdges={edges}
+        />
       </div>
 
       {/* ===== RIGHT (25%) = RESIZABLE SECTIONS ===== */}

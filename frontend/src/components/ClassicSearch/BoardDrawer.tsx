@@ -31,10 +31,10 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
   const activeBoard = boards.find((b) => b.id === activeBoardId);
   const activeReferenceBlocks = activeBoardId ? getReferenceBlocks(activeBoardId) : [];
 
-  const handleCreateBoard = (useTemplate: boolean = false) => {
-    const name = newBoardName.trim() || (useTemplate ? 'Research Board' : 'Untitled Board');
-    if (useTemplate) {
-      createBoardWithTemplate(name);
+  const handleCreateBoard = (template?: 'moodboard' | 'precedent' | 'slides') => {
+    const name = newBoardName.trim() || 'Untitled Board';
+    if (template) {
+      createBoardWithTemplate(name, template);
     } else {
       createBoard(name);
     }
@@ -276,16 +276,15 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                 />
                 
                 {/* Template choice buttons */}
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <button
-                    onClick={() => handleCreateBoard(false)}
+                    onClick={() => handleCreateBoard()}
                     style={{
-                      flex: 1,
+                      width: '100%',
                       display: 'flex',
-                      flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '6px',
-                      padding: '14px 12px',
+                      gap: '10px',
+                      padding: '12px',
                       backgroundColor: 'rgba(0,0,0,0.02)',
                       border: '1px solid rgba(0,0,0,0.1)',
                       borderRadius: '8px',
@@ -302,20 +301,21 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                       e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)';
                     }}
                   >
-                    <FileText size={20} style={{ color: 'rgba(0,0,0,0.5)' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 500 }}>Blank</span>
-                    <span style={{ fontSize: '10px', color: 'rgba(0,0,0,0.4)' }}>Start empty</span>
+                    <FileText size={18} style={{ color: 'rgba(0,0,0,0.5)' }} />
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 500 }}>Blank Board</div>
+                      <div style={{ fontSize: '11px', color: 'rgba(0,0,0,0.4)' }}>Start from scratch</div>
+                    </div>
                   </button>
                   
                   <button
-                    onClick={() => handleCreateBoard(true)}
+                    onClick={() => handleCreateBoard('moodboard')}
                     style={{
-                      flex: 1,
+                      width: '100%',
                       display: 'flex',
-                      flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '6px',
-                      padding: '14px 12px',
+                      gap: '10px',
+                      padding: '12px',
                       backgroundColor: 'rgba(182, 68, 36, 0.05)',
                       border: '1px solid var(--accent)',
                       borderRadius: '8px',
@@ -330,9 +330,69 @@ export function BoardDrawer({ isOpen, onClose }: BoardDrawerProps) {
                       e.currentTarget.style.backgroundColor = 'rgba(182, 68, 36, 0.05)';
                     }}
                   >
-                    <Layout size={20} style={{ color: 'var(--accent)' }} />
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--accent)' }}>Template</span>
-                    <span style={{ fontSize: '10px', color: 'rgba(0,0,0,0.4)' }}>Narrative structure</span>
+                    <Layout size={18} style={{ color: 'var(--accent)' }} />
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--accent)' }}>Moodboard</div>
+                      <div style={{ fontSize: '11px', color: 'rgba(0,0,0,0.4)' }}>Masonry grid with title</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleCreateBoard('precedent')}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '12px',
+                      backgroundColor: 'rgba(182, 68, 36, 0.05)',
+                      border: '1px solid var(--accent)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-secondary)',
+                      transition: 'all 150ms ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(182, 68, 36, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(182, 68, 36, 0.05)';
+                    }}
+                  >
+                    <Layout size={18} style={{ color: 'var(--accent)' }} />
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--accent)' }}>Precedent Comparison</div>
+                      <div style={{ fontSize: '11px', color: 'rgba(0,0,0,0.4)' }}>2x2 grid with frames</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleCreateBoard('slides')}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '12px',
+                      backgroundColor: 'rgba(182, 68, 36, 0.05)',
+                      border: '1px solid var(--accent)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-secondary)',
+                      transition: 'all 150ms ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(182, 68, 36, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(182, 68, 36, 0.05)';
+                    }}
+                  >
+                    <Layout size={18} style={{ color: 'var(--accent)' }} />
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--accent)' }}>Slide Deck</div>
+                      <div style={{ fontSize: '11px', color: 'rgba(0,0,0,0.4)' }}>3-6 frames pre-created</div>
+                    </div>
                   </button>
                 </div>
                 

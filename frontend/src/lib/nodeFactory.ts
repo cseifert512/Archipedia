@@ -22,6 +22,7 @@ export function createNode(
     type === 'operatorAND' ? 'operatorAND' :
     type === 'operatorOR' ? 'operatorOR' :
     type === 'operatorNOT' ? 'operatorNOT' :
+    type === 'results' ? 'results' :
     type === 'text' ? 'text' :
     'default';
 
@@ -133,6 +134,17 @@ export function createOperatorNOTNode(
     exclusionStrategy: 'mask',
     similarityThreshold: 0.70,
     outputResults: [],
+  });
+}
+
+export function createResultsNode(
+  position: { x: number; y: number },
+  resultCount: number = 0
+): Node<NodeData> {
+  return createNode('results', position, {
+    type: 'results',
+    resultCount,
+    results: [],
   });
 }
 

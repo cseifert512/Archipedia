@@ -58,16 +58,27 @@ export const AttributeFilterNode: React.FC<AttributeFilterNodeProps> = ({
     }
   };
 
-  // Calculate positions for connection handles
-  const inputHandleY = 120; // After header, at INPUT section
-  const outputHandleY = 480; // At OUTPUT section
+  // Calculate positions for connection handles aligned with text labels
+  const headerHeight = 48;
+  const contentPadding = 16;
+  const inputSectionTop = headerHeight + contentPadding + 8; // Header + padding + margin to INPUT label
+  const inputHandleY = inputSectionTop + 10; // Aligned with "INPUT: Results from upstream" text
+  
+  // OUTPUT section is near the bottom, align with "OUTPUT: Filtered Results" text
+  // Calculate based on content sections: INPUT + FUSION WEIGHTS + KEYWORD + OUTPUT
+  const inputSectionHeight = 40;
+  const fusionWeightsHeight = 120;
+  const keywordSectionHeight = 60;
+  const outputSectionTop = headerHeight + contentPadding + inputSectionHeight + fusionWeightsHeight + keywordSectionHeight + 16 + 8;
+  // OUTPUT section starts at outputSectionTop, text is at +8px, so handle should be at +18px to align with text
+  const outputHandleY = outputSectionTop + 18; // Aligned with "OUTPUT: Filtered Results" text
 
   return (
     <div
       className="rounded-lg overflow-visible cursor-move group transition-all"
       style={{
         width: '400px',
-        minHeight: '600px',
+        minHeight: '450px',
         backgroundColor: '#FFFFFF',
         border: selected ? '2px solid #90EE90' : '1px solid rgba(0,0,0,0.1)',
         borderRadius: '12px',
@@ -82,38 +93,86 @@ export const AttributeFilterNode: React.FC<AttributeFilterNodeProps> = ({
       }}
     >
       {/* Connection Handle - INPUT (Left side) */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="input"
+      <div
         style={{
-          left: '-8px',
+          position: 'absolute',
+          left: '-20px',
           top: `${inputHandleY}px`,
-          width: '16px',
-          height: '16px',
-          background: '#90EE90',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: 'inset(0 50% 0 0)',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="input"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#90EE90',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
 
       {/* Connection Handle - OUTPUT (Right side) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="output"
+      <div
         style={{
-          right: '-8px',
+          position: 'absolute',
+          right: '-20px',
           top: `${outputHandleY}px`,
-          width: '16px',
-          height: '16px',
-          background: '#90EE90',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: 'inset(0 0 0 50%)',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="output"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#90EE90',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
 
       {/* Header */}
       <div
@@ -359,27 +418,8 @@ export const AttributeFilterNode: React.FC<AttributeFilterNodeProps> = ({
           <div style={{ fontFamily: 'var(--font-primary)', fontSize: '11px', color: 'rgba(0,0,0,0.7)' }}>
             ◉ {outputCount} results ({inputCount - outputCount} filtered out)
           </div>
-          <div
-            style={{
-              marginTop: '8px',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '4px',
-            }}
-          >
-            {Array.from({ length: Math.min(outputCount, 6) }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  aspectRatio: '1',
-                  backgroundColor: '#90EE90',
-                  borderRadius: '4px',
-                  opacity: 0.6,
-                }}
-              />
-            ))}
-          </div>
         </div>
+
       </div>
 
       {/* Footer: Action Buttons */}
@@ -430,25 +470,6 @@ export const AttributeFilterNode: React.FC<AttributeFilterNodeProps> = ({
           }}
         >
           Apply Filters
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            // Output to downstream nodes
-          }}
-          disabled={outputCount === 0}
-          style={{
-            padding: '8px 12px',
-            backgroundColor: outputCount > 0 ? '#90EE90' : 'rgba(0,0,0,0.1)',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: outputCount > 0 ? 'pointer' : 'not-allowed',
-            fontFamily: 'var(--font-primary)',
-            fontSize: '10px',
-            color: '#000000',
-          }}
-        >
-          → Output
         </button>
       </div>
     </div>

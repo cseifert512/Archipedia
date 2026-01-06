@@ -4,7 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useParams, useSearch } from 'wouter';
-import { useBoardStore, BoardBlock, ReferenceBlock, TextBlock, DividerBlock } from '../stores/boardStore';
+import { useBoardStore, BoardBlock, ReferenceBlock, TextBlock, DividerBlock, FrameBlock } from '../stores/boardStore';
 
 export function BoardPrintPage() {
   const params = useParams<{ id: string }>();
@@ -105,61 +105,162 @@ export function BoardPrintPage() {
     );
   }
 
-  // Slides format: paginated for 16:9 presentation
+  // Slides format: frame-based pagination for 16:9 presentation
   return (
-    <div style={{ backgroundColor: '#f5f5f5' }}>
-      {/* Title Slide */}
-      <div
-        style={{
-          width: '1280px',
-          height: '720px',
-          backgroundColor: 'white',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: '80px',
-          pageBreakAfter: 'always',
-        }}
-      >
-        <h1
+    <>
+      <style>{`
+        @media print {
+          .frame-section {
+            page-break-after: always;
+            page-break-inside: avoid;
+          }
+        }
+        @page {
+          size: 1280px 720px;
+          margin: 0;
+        }
+      `}</style>
+      <div style={{ backgroundColor: '#f5f5f5' }}>
+        {/* Frame-based slides: Each frame defines a slide boundary */}
+        <FrameBasedSlides blocks={sortedBlocks} boardTitle={board.title} boardSubtitle={board.subtitle} />
+      </div>
+    </>
+  );
+}
+
+// ============ Frame-Based Slides Layout ============
+
+function FrameBasedSlides({ 
+  blocks, 
+  boardTitle, 
+  boardSubtitle 
+}: { 
+  blocks: BoardBlock[]; 
+  boardTitle: string;
+  boardSubtitle?: string;
+}) {
+  // Group blocks by frames: blocks between Frame N and Frame N+1 belong to slide N
+  const slides: { frame?: FrameBlock; blocks: BoardBlock[] }[] = [];
+  let currentSlide: { frame?: FrameBlock; blocks: BoardBlock[] } = { blocks: [] };
+  let hasFrames = false;
+
+  for (const block of blocks) {
+    if (block.type === 'frame') {
+      hasFrames = true;
+      // Start a new slide with this frame
+      if (currentSlide.blocks.length > 0 || currentSlide.frame) {
+        slides.push(currentSlide);
+      }
+      currentSlide = { frame: block as FrameBlock, blocks: [] };
+    } else {
+      // Add block to current slide
+      currentSlide.blocks.push(block);
+    }
+  }
+
+  // Add the last slide
+  if (currentSlide.blocks.length > 0 || currentSlide.frame) {
+    slides.push(currentSlide);
+  }
+
+  // If no frames exist, create a title slide and group blocks
+  if (!hasFrames) {
+    return (
+      <>
+        {/* Title Slide */}
+        <div
+          className="frame-section"
           style={{
-            fontFamily: 'var(--font-primary), Georgia, serif',
-            fontSize: '56px',
-            fontWeight: 600,
-            margin: 0,
-            marginBottom: '16px',
-            textAlign: 'center',
+            width: '1280px',
+            height: '720px',
+            backgroundColor: 'white',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '80px',
+            pageBreakAfter: 'always',
           }}
         >
-          {board.title}
-        </h1>
-        {board.subtitle && (
-          <p
+          <h1
             style={{
-              fontSize: '24px',
-              color: '#666',
+              fontFamily: 'var(--font-primary), Georgia, serif',
+              fontSize: '56px',
+              fontWeight: 600,
               margin: 0,
+              marginBottom: '16px',
               textAlign: 'center',
             }}
           >
-            {board.subtitle}
-          </p>
-        )}
+            {boardTitle}
+          </h1>
+          {boardSubtitle && (
+            <p
+              style={{
+                fontSize: '24px',
+                color: '#666',
+                margin: 0,
+                textAlign: 'center',
+              }}
+            >
+              {boardSubtitle}
+            </p>
+          )}
+        </div>
+
+        {/* Content without frames - use old grouping logic */}
+        <SlidesContent blocks={blocks} />
+
+        {/* End Slide */}
         <div
           style={{
-            marginTop: '48px',
-            fontSize: '14px',
-            color: '#888',
+            width: '1280px',
+            height: '720px',
+            backgroundColor: 'white',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '80px',
           }}
         >
-          {board.blocks.filter((b) => b.type === 'reference').length} precedent references
+          <p
+            style={{
+              fontSize: '18px',
+              color: '#666',
+              marginBottom: '16px',
+            }}
+          >
+            Created with
+          </p>
+          <h2
+            style={{
+              fontFamily: 'var(--font-primary), Georgia, serif',
+              fontSize: '36px',
+              fontWeight: 600,
+              color: 'var(--accent, #b64424)',
+            }}
+          >
+            Archipedia
+          </h2>
         </div>
-      </div>
+      </>
+    );
+  }
 
-      {/* Content Slides - group references */}
-      <SlidesContent blocks={sortedBlocks} />
-
+  // Render frame-based slides
+  return (
+    <>
+      {slides.map((slide, idx) => (
+        <FrameSlide
+          key={idx}
+          frame={slide.frame}
+          blocks={slide.blocks}
+          isFirst={idx === 0}
+          boardTitle={boardTitle}
+          boardSubtitle={boardSubtitle}
+        />
+      ))}
       {/* End Slide */}
       <div
         style={{
@@ -193,11 +294,92 @@ export function BoardPrintPage() {
           Archipedia
         </h2>
       </div>
+    </>
+  );
+}
+
+function FrameSlide({
+  frame,
+  blocks,
+  isFirst,
+  boardTitle,
+  boardSubtitle,
+}: {
+  frame?: FrameBlock;
+  blocks: BoardBlock[];
+  isFirst: boolean;
+  boardTitle: string;
+  boardSubtitle?: string;
+}) {
+  const frameTitle = frame?.data.title || (isFirst ? boardTitle : 'Slide');
+  const frameBackground = frame?.data.background || 'white';
+
+  return (
+    <div
+      className="frame-section"
+      style={{
+        width: '1280px',
+        height: '720px',
+        backgroundColor: frameBackground.startsWith('#') || frameBackground.startsWith('rgb') 
+          ? frameBackground 
+          : 'white',
+        backgroundImage: frameBackground.startsWith('http') || frameBackground.startsWith('/') 
+          ? `url(${frameBackground})` 
+          : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '60px',
+        pageBreakAfter: 'always',
+      }}
+    >
+      {/* Frame Title */}
+      {frame && (
+        <h2
+          style={{
+            fontFamily: 'var(--font-primary), Georgia, serif',
+            fontSize: '32px',
+            fontWeight: 600,
+            margin: 0,
+            marginBottom: '32px',
+            color: frameBackground.startsWith('#') || frameBackground.startsWith('rgb') 
+              ? '#000' 
+              : '#fff',
+            textShadow: frameBackground.startsWith('http') || frameBackground.startsWith('/')
+              ? '0 2px 4px rgba(0,0,0,0.3)'
+              : 'none',
+          }}
+        >
+          {frameTitle}
+        </h2>
+      )}
+
+      {/* Slide Content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {blocks.length === 0 ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <p
+              style={{
+                fontFamily: 'var(--font-secondary)',
+                fontSize: '16px',
+                color: 'rgba(0,0,0,0.4)',
+              }}
+            >
+              {isFirst ? boardSubtitle || 'Add content to this slide' : 'Empty slide'}
+            </p>
+          </div>
+        ) : (
+          blocks.map((block) => (
+            <PrintBlock key={block.id} block={block} />
+          ))
+        )}
+      </div>
     </div>
   );
 }
 
-// ============ Slides Content Layout ============
+// ============ Slides Content Layout (fallback when no frames) ============
 
 function SlidesContent({ blocks }: { blocks: BoardBlock[] }) {
   const slides: BoardBlock[][] = [];
@@ -414,6 +596,10 @@ function PrintBlock({ block }: { block: BoardBlock }) {
   }
   if (block.type === 'divider') {
     return <PrintDividerBlock block={block as DividerBlock} />;
+  }
+  if (block.type === 'frame') {
+    // Frames are handled at the slide level, not rendered as content
+    return null;
   }
   return null;
 }
