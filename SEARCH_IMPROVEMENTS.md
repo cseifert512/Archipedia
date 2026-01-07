@@ -26,6 +26,7 @@ The following improvements have been **implemented**:
 | 12 | Progressive Result Loading | ✅ **DONE** | Added `page`/`page_size` params to search endpoints. Load More button in ClassicSearchPage and StudyResultsPage. |
 | 21 | Multi-Image Query | ✅ **DONE** | New `/search/multi-image` endpoint with fusion strategies (average, max_pool, weighted). Multi-image upload grid in ClassicSearchBar. |
 | 22 | Negative Search (Exclude Filters) | ✅ **DONE** | Added `exclude_*` fields to Filters model. Exclusion mode toggle in FilterSidebar. Negative image references in search. |
+| 18 | Query Expansion (More like this) | ✅ **DONE** | "Search like this" uses image embeddings via `/search/id`. Added `searchByImageId()` API function. Pagination support. |
 
 **Additional UI improvements:**
 - Filter sidebar now collapsed by default (`FilterSidebar.tsx`)
@@ -337,11 +338,20 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 ## 🟢 Feature Additions
 
-### 18. **Query Expansion**
+### 18. **Query Expansion** ✅ IMPLEMENTED
 **Recommendation**:
 - Expand visual queries with semantically similar embeddings
 - Use synonym expansion for text queries
 - Implement "More like this" button on results
+
+**Implementation Details**:
+- Added pagination support (`page`, `page_size`) to `/search/id` endpoint in `main.py`
+- Response now includes `has_more`, `total_count`, `page`, `page_size` fields
+- Created `searchByImageId()` function in `navigatorApi.ts` to call `/search/id`
+- Updated `handleSearchLikeThis` in `ClassicSearchPage.tsx` and `StudyResultsPage.tsx` to use `searchByImageId`
+- "Search like this" button now uses pre-computed image embeddings for instant similarity search
+- Shows toast notifications: "Finding projects similar to..." and "Found X similar projects"
+- Records search to history as "Similar to: [project title]"
 
 **Impact**: Better recall, discoverability
 
@@ -502,7 +512,7 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 4. ~~Better weight normalization (#6)~~ ✅ DONE
 5. ~~Search explanations (#11)~~ ✅ DONE
 6. ~~Progressive loading (#12)~~ ✅ DONE
-7. Query expansion (#18)
+7. ~~Query expansion (#18)~~ ✅ DONE
 8. Patch match heatmaps (#25)
 9. ~~Multi-image queries (#21)~~ ✅ DONE
 10. ~~Negative search (#22)~~ ✅ DONE
@@ -538,7 +548,7 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 - ~~Multi-image queries (#21)~~ ✅
 - ~~Negative search / Exclude filters (#22)~~ ✅
 - Advanced spatial search (#20)
-- Query expansion (#18)
+- ~~Query expansion (#18)~~ ✅
 - Patch-wise image tagging (#23)
 - Patch-based similarity search (#24)
 - Patch match heatmaps (#25)

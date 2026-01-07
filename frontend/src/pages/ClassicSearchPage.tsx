@@ -16,7 +16,7 @@ import { HamburgerMenu } from '../components/HamburgerMenu';
 import { useBoardStore } from '../stores/boardStore';
 import { mockProjects } from '../lib/mockData';
 import { toast } from 'sonner';
-import { searchByText, searchByImageFile, searchHybrid, searchByMultipleImages, toAbsoluteUrl, SearchError } from '../lib/navigatorApi';
+import { searchByText, searchByImageFile, searchHybrid, searchByMultipleImages, searchByImageId, toAbsoluteUrl, SearchError } from '../lib/navigatorApi';
 import { addToHistory } from '../lib/searchHistory';
 
 type SortOption = 'best' | 'visual' | 'semantic';
@@ -565,10 +565,103 @@ export function ClassicSearchPage() {
     });
   };
 
-  const handleSearchLikeThis = (result: SearchResultData, currentImage?: ProjectImage) => {
-    // Use the currently displayed image to search
-    const imageUrl = currentImage?.image_url || result.image_url;
-    performSearch('', imageUrl, 'visual');
+  const handleSearchLikeThis = async (result: SearchResultData, currentImage?: ProjectImage) => {
+    // Use the currently displayed image's embedding to search for similar projects
+    const imageId = currentImage?.image_id || result.image_id;
+    
+    if (!imageId) {
+      toast.error('Cannot search: no image ID available');
+      return;
+    }
+    
+    setIsSearching(true);
+    setHasSearched(true);
+    setSearchError(null);
+    setQuery(''); // Clear text query since this is visual-only search
+    setUploadedImage(null);
+    setMultiImageData(null);
+    setCurrentPage(1);
+    
+    toast.info(`Finding projects similar to "${result.project_title}"...`);
+    
+    try {
+      const response = await searchByImageId(imageId, {
+        topK: 50,
+        page: 1,
+        pageSize: PAGE_SIZE,
+        wVisual: 1.0,
+        wAttr: 0.25,
+      });
+      
+      const apiResults = response.results || [];
+      const apiHasMore = response.has_more ?? false;
+      const apiTotalCount = response.total_count ?? apiResults.length;
+      
+      setHasMore(apiHasMore);
+      setTotalCount(apiTotalCount);
+      
+      // Transform results
+      const transformedResults: SearchResultData[] = apiResults.map((apiResult, index) => {
+        const score = apiResult.score ?? (1 - (apiResult.distance ?? 0.5));
+        const thumbUrl = toAbsoluteUrl(apiResult.thumb_url) || '';
+        
+        let projectImages: ProjectImage[] = [];
+        if (apiResult.image_urls && Array.isArray(apiResult.image_urls) && apiResult.image_urls.length > 0) {
+          projectImages = apiResult.image_urls.map((url: string, idx: number) => ({
+            image_id: `img_${apiResult.project_id}_${idx}`,
+            thumb_url: url,
+            image_url: url,
+          }));
+        } else if (thumbUrl) {
+          projectImages = [{
+            image_id: apiResult.image_id || `img_${apiResult.project_id}_01`,
+            thumb_url: thumbUrl,
+            image_url: thumbUrl,
+          }];
+        }
+        
+        return {
+          project_id: apiResult.project_id || `project-${index}`,
+          project_title: apiResult.title || apiResult.project_id || 'Unknown Project',
+          architect: apiResult.architect || 'Unknown Architect',
+          location_display: apiResult.country || 'Unknown Location',
+          year: apiResult.year || 2024,
+          image_id: apiResult.image_id || `img_${apiResult.project_id}_01`,
+          thumb_url: projectImages[0]?.thumb_url || thumbUrl,
+          image_url: projectImages[0]?.image_url || thumbUrl,
+          images: projectImages,
+          score: score,
+          match_reason: apiResult.match_reason || 'Similar visual style',
+          badges: {
+            typology: apiResult.typology ? [apiResult.typology] : [],
+            country: apiResult.country ? [apiResult.country] : [],
+            climate_bin: apiResult.climate_bin ? [apiResult.climate_bin] : [],
+          },
+        };
+      });
+      
+      setResults(transformedResults);
+      
+      // Record to history
+      addToHistory(`Similar to: ${result.project_title}`, true, transformedResults.length);
+      
+      toast.success(`Found ${transformedResults.length} similar projects`);
+    } catch (error) {
+      console.error('Search like this failed:', error);
+      
+      if (error instanceof SearchError) {
+        setSearchError({
+          message: error.message,
+          suggestion: error.suggestion,
+        });
+        setResults([]);
+      } else {
+        toast.error('Search failed. Please try again.');
+        setResults([]);
+      }
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   // Check if an item is saved

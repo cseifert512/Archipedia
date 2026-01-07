@@ -248,7 +248,9 @@ class SearchOpts(BaseModel):
 
 class SearchById(BaseModel):
     image_id: str
-    top_k: int = 12
+    top_k: int = 50
+    page: int = 1
+    page_size: int = 12
     weights: Weights = Weights()
     filters: Filters = Filters()
     strict: bool = False
@@ -570,11 +572,23 @@ def reload_index():
 
 @app.post("/search/id")
 def search_id(body: SearchById, _: bool = Depends(require_token)):
+    """
+    Search for similar images using an existing image's embedding.
+    Supports pagination with page/page_size parameters.
+    Used by "Search like this" / "More like this" feature.
+    """
     st = get_store()
     try:
         q = st.vector_for_image(body.image_id)
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(
+            status_code=404, 
+            detail={
+                "error": "embedding_not_found",
+                "message": f"No embedding found for image_id: {body.image_id}",
+                "suggestion": "The image may not have been indexed. Try a different image."
+            }
+        )
     
     # Generate query ID
     query_id = generate_query_id()
@@ -604,11 +618,23 @@ def search_id(body: SearchById, _: bool = Depends(require_token)):
     # Apply lens filtering
     lensed_results = apply_lens(fused_results, body.lens_ids, body.lens_projects, body.top_k)
     
+    # Apply pagination
+    total_count = len(lensed_results)
+    start_idx = (body.page - 1) * body.page_size
+    end_idx = start_idx + body.page_size
+    paginated_results = lensed_results[start_idx:end_idx]
+    has_more = end_idx < total_count
+    
+    # Assign ranks based on pagination
+    for i, result in enumerate(paginated_results):
+        result["rank"] = start_idx + i + 1
+    
     # Add lens debug info
     debug["lens"] = {
         "ids": len(body.lens_ids or []),
         "projects": len(body.lens_projects or [])
     }
+    debug["source_image_id"] = body.image_id
     
     return {
         "query_id": query_id,
@@ -617,7 +643,11 @@ def search_id(body: SearchById, _: bool = Depends(require_token)):
         "weights": body.weights.model_dump(),
         "weights_effective": debug["weights_effective"],
         "filters": body.filters.model_dump(),
-        "results": lensed_results,
+        "results": paginated_results,
+        "page": body.page,
+        "page_size": body.page_size,
+        "has_more": has_more,
+        "total_count": total_count,
         "debug": debug
     }
 

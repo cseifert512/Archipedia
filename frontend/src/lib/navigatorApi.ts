@@ -506,6 +506,71 @@ export async function searchByMultipleImages(
   return (await res.json()) as MultiImageSearchResponse;
 }
 
+// ---- Search by Image ID ("More like this") ----
+
+export interface SearchByImageIdOptions {
+  /** Number of results to return */
+  topK?: number;
+  /** Page number (1-indexed) */
+  page?: number;
+  /** Results per page */
+  pageSize?: number;
+  /** Visual weight (0-1) */
+  wVisual?: number;
+  /** Attribute weight (0-1) */
+  wAttr?: number;
+  /** Spatial weight (0-1) */
+  wSpatial?: number;
+}
+
+/**
+ * Search for similar images using an existing image's embedding.
+ * Used by "Search like this" / "More like this" feature.
+ * 
+ * @param imageId - The ID of an existing image to use as the search query
+ * @param options - Search options including pagination and weights
+ * @returns Promise with search results
+ * 
+ * @example
+ * // Find projects similar to a specific image
+ * const results = await searchByImageId("i_p_xxx_exteriors_p_xxx_exterior_1");
+ */
+export async function searchByImageId(
+  imageId: string,
+  options?: SearchByImageIdOptions
+): Promise<NavigatorSearchFileResponse> {
+  const base = getApiBaseUrl();
+  
+  const body = {
+    image_id: imageId,
+    top_k: options?.topK ?? 50,
+    page: options?.page ?? 1,
+    page_size: options?.pageSize ?? 12,
+    weights: {
+      visual: options?.wVisual ?? 1.0,
+      spatial: options?.wSpatial ?? 0.0,
+      attr: options?.wAttr ?? 0.25,
+    },
+    filters: {},
+    strict: false,
+  };
+  
+  const res = await fetch(`${base}/search/id`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify(body),
+  });
+  
+  if (!res.ok) {
+    throw await parseErrorResponse(res);
+  }
+  
+  return (await res.json()) as NavigatorSearchFileResponse;
+}
+
 // ---- Autocomplete ----
 
 export interface AutocompleteSuggestion {
