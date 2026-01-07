@@ -235,8 +235,9 @@ class TextEmbeddingIndex:
     
     def _keyword_search(self, query: str, top_k: int) -> List[Dict[str, Any]]:
         """
-        Fallback keyword search for short queries.
+        Fallback keyword search for queries.
         Searches by substring matching in titles, typologies, and searchable text.
+        For multi-word queries, requires ALL words to be present (AND logic).
         
         Args:
             query: Search query (lowercased)
@@ -246,6 +247,7 @@ class TextEmbeddingIndex:
             List of matching results with scores
         """
         query_lower = query.lower().strip()
+        query_words = [w for w in query_lower.split() if len(w) >= 2]  # Split into words, ignore very short ones
         matches = []
         
         for i, meta in enumerate(self._metadata):
@@ -254,16 +256,43 @@ class TextEmbeddingIndex:
             searchable = str(meta.get("searchable_text", "")).lower()
             country = str(meta.get("country", "")).lower()
             
-            # Check for substring matches with different weights
-            score = 0.0
-            if query_lower in title:
-                score = 0.85  # Title match is strongest
-            elif query_lower in typology:
-                score = 0.75  # Typology match is strong
-            elif query_lower in country:
-                score = 0.65  # Country match
-            elif query_lower in searchable:
-                score = 0.55  # General text match
+            # Combine all searchable fields
+            all_text = f"{title} {typology} {country} {searchable}"
+            
+            # For multi-word queries, check if ALL words are present
+            if len(query_words) > 1:
+                words_found = sum(1 for word in query_words if word in all_text)
+                if words_found == 0:
+                    continue
+                    
+                # Score based on how many words matched and where
+                base_score = words_found / len(query_words)  # 0.5 to 1.0
+                
+                # Boost if all words found
+                if words_found == len(query_words):
+                    # Check for matches in higher-value fields
+                    if all(word in title for word in query_words):
+                        score = 0.90
+                    elif all(word in typology for word in query_words):
+                        score = 0.80
+                    elif any(word in typology for word in query_words):
+                        score = 0.70
+                    else:
+                        score = 0.60  # All words found in searchable text
+                else:
+                    # Partial match - some words found
+                    score = 0.40 * base_score
+            else:
+                # Single word query - use original logic
+                score = 0.0
+                if query_lower in title:
+                    score = 0.85  # Title match is strongest
+                elif query_lower in typology:
+                    score = 0.75  # Typology match is strong
+                elif query_lower in country:
+                    score = 0.65  # Country match
+                elif query_lower in searchable:
+                    score = 0.55  # General text match
                 
             if score > 0:
                 result = {
