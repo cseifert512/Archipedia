@@ -4,7 +4,7 @@ This document outlines comprehensive improvements for the Archipedia search syst
 
 ---
 
-## ✅ Implementation Status (Updated: Dec 30, 2024)
+## ✅ Implementation Status (Updated: Jan 6, 2026)
 
 The following improvements have been **implemented**:
 
@@ -24,6 +24,8 @@ The following improvements have been **implemented**:
 | 8 | Hybrid Search (Text + Image) | ✅ **DONE** | New `/search/hybrid` endpoint combines visual and text search with weighted fusion. Drag-and-drop from results to search bar. |
 | 9 | Search Autocomplete/Suggestions | ✅ **DONE** | New `/autocomplete` endpoint. In-memory index from projects.csv. Frontend dropdown with category badges. |
 | 12 | Progressive Result Loading | ✅ **DONE** | Added `page`/`page_size` params to search endpoints. Load More button in ClassicSearchPage and StudyResultsPage. |
+| 21 | Multi-Image Query | ✅ **DONE** | New `/search/multi-image` endpoint with fusion strategies (average, max_pool, weighted). Multi-image upload grid in ClassicSearchBar. |
+| 22 | Negative Search (Exclude Filters) | ✅ **DONE** | Added `exclude_*` fields to Filters model. Exclusion mode toggle in FilterSidebar. Negative image references in search. |
 
 **Additional UI improvements:**
 - Filter sidebar now collapsed by default (`FilterSidebar.tsx`)
@@ -363,19 +365,38 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 **Impact**: Better architectural plan search
 
-### 21. **Multi-Image Query**
+### 21. **Multi-Image Query** ✅ IMPLEMENTED
 **Recommendation**:
 - Allow users to upload multiple reference images
 - Combine embeddings (average, weighted average, or best match)
 - Support "Find projects that match ALL of these images"
 
+**Implementation Details**:
+- Created `/search/multi-image` endpoint in `main.py` accepting 1-5 positive images and 0-3 negative images
+- Implemented `fuse_embeddings()` with three fusion strategies:
+  - `average` - Mean of all embeddings (Match All)
+  - `max_pool` - Preserves strongest features from any image (Match Any)
+  - `weighted` - User-controlled importance per image
+- Implemented `fuse_with_negatives()` to push results away from negative reference images
+- Frontend multi-image grid in `ClassicSearchBar.tsx` with thumbnails and remove buttons
+- Fusion mode selector in Advanced panel
+- Added `searchByMultipleImages()` in `navigatorApi.ts`
+
 **Impact**: More precise queries, better specificity
 
-### 22. **Negative Search (Exclude Filters)**
+### 22. **Negative Search (Exclude Filters)** ✅ IMPLEMENTED
 **Recommendation**:
 - Allow "NOT typology" filters
 - Implement negative image queries ("not like this")
 - Support exclusion lists
+
+**Implementation Details**:
+- Added `exclude_typology`, `exclude_climate_bin`, `exclude_massing_type`, `exclude_project_ids` fields to `Filters` model
+- Updated `_apply_filters()` in `pipeline.py` to handle exclusion filtering
+- Frontend exclusion mode toggle in `FilterSidebar.tsx` for Typology, Climate, and Massing filters
+- Excluded items shown with strikethrough styling and red color
+- Exclusion count shown with red badge in filter header
+- Negative image drop zone with red visual distinction in ClassicSearchBar
 
 **Impact**: More refined search capabilities
 
@@ -483,6 +504,8 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 6. ~~Progressive loading (#12)~~ ✅ DONE
 7. Query expansion (#18)
 8. Patch match heatmaps (#25)
+9. ~~Multi-image queries (#21)~~ ✅ DONE
+10. ~~Negative search (#22)~~ ✅ DONE
 
 ---
 
@@ -512,7 +535,8 @@ v_sim = np.exp(-alpha * v_dist)  # Or sigmoid(-v_dist)
 
 ### Phase 4 (6+ weeks): Advanced Features
 - Relevance feedback (#19)
-- Multi-image queries (#21)
+- ~~Multi-image queries (#21)~~ ✅
+- ~~Negative search / Exclude filters (#22)~~ ✅
 - Advanced spatial search (#20)
 - Query expansion (#18)
 - Patch-wise image tagging (#23)
