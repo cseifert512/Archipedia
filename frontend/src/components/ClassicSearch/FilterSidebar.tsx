@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Filter, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Filter, X, ChevronDown, ChevronUp, MinusCircle } from 'lucide-react';
 
 export interface FilterState {
+  // Inclusion filters
   typology: string[];
   country: string[];
   climate_bin: string[];
@@ -10,6 +11,11 @@ export interface FilterState {
   year_range?: { min: number; max: number };
   architect: string[];
   wwr_band: string[];
+  // Exclusion filters
+  exclude_typology?: string[];
+  exclude_climate_bin?: string[];
+  exclude_massing_type?: string[];
+  exclude_project_ids?: string[];
 }
 
 interface FilterSidebarProps {
@@ -88,18 +94,53 @@ interface FilterGroupProps {
   selected: string[];
   onChange: (values: string[]) => void;
   defaultExpanded?: boolean;
+  /** Exclusion mode - items selected here are excluded, not included */
+  excluded?: string[];
+  onExcludedChange?: (values: string[]) => void;
+  /** Enable exclusion mode toggle */
+  enableExclusion?: boolean;
 }
 
-function FilterGroup({ title, options, selected, onChange, defaultExpanded = false }: FilterGroupProps) {
+function FilterGroup({ 
+  title, 
+  options, 
+  selected, 
+  onChange, 
+  defaultExpanded = false,
+  excluded = [],
+  onExcludedChange,
+  enableExclusion = false,
+}: FilterGroupProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [isExclusionMode, setIsExclusionMode] = useState(false);
   
   const toggleOption = (option: string) => {
-    if (selected.includes(option)) {
-      onChange(selected.filter((v) => v !== option));
+    if (isExclusionMode && onExcludedChange) {
+      // Exclusion mode
+      if (excluded.includes(option)) {
+        onExcludedChange(excluded.filter((v) => v !== option));
+      } else {
+        // Remove from included if present
+        if (selected.includes(option)) {
+          onChange(selected.filter((v) => v !== option));
+        }
+        onExcludedChange([...excluded, option]);
+      }
     } else {
-      onChange([...selected, option]);
+      // Inclusion mode
+      if (selected.includes(option)) {
+        onChange(selected.filter((v) => v !== option));
+      } else {
+        // Remove from excluded if present
+        if (excluded.includes(option) && onExcludedChange) {
+          onExcludedChange(excluded.filter((v) => v !== option));
+        }
+        onChange([...selected, option]);
+      }
     }
   };
+
+  const totalSelected = selected.length + excluded.length;
 
   return (
     <div style={{ marginBottom: '20px' }}>
@@ -136,45 +177,104 @@ function FilterGroup({ title, options, selected, onChange, defaultExpanded = fal
               ({selected.length})
             </span>
           )}
+          {excluded.length > 0 && (
+            <span
+              style={{
+                marginLeft: '4px',
+                fontSize: '10px',
+                fontWeight: 500,
+                color: 'rgb(220, 38, 38)',
+              }}
+            >
+              (-{excluded.length})
+            </span>
+          )}
         </span>
         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
       
       {isExpanded && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
-          {options.map((option) => {
-            const isChecked = selected.includes(option);
-            return (
-              <label
-                key={option}
+        <div>
+          {/* Exclusion mode toggle */}
+          {enableExclusion && onExcludedChange && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '10px',
+                padding: '6px 8px',
+                backgroundColor: isExclusionMode ? 'rgba(220, 38, 38, 0.05)' : 'rgba(0,0,0,0.02)',
+                borderRadius: '6px',
+                border: isExclusionMode ? '1px solid rgba(220, 38, 38, 0.2)' : '1px solid transparent',
+              }}
+            >
+              <button
+                onClick={() => setIsExclusionMode(!isExclusionMode)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  fontFamily: 'var(--font-secondary)',
-                  fontSize: '13px',
-                  color: isChecked ? '#000' : 'rgba(0,0,0,0.7)',
+                  gap: '4px',
+                  background: 'none',
+                  border: 'none',
                   cursor: 'pointer',
-                  padding: '4px 0',
-                  fontWeight: isChecked ? 500 : 400,
-                  transition: 'all 150ms ease',
+                  fontFamily: 'var(--font-secondary)',
+                  fontSize: '11px',
+                  color: isExclusionMode ? 'rgb(220, 38, 38)' : 'rgba(0,0,0,0.5)',
+                  fontWeight: isExclusionMode ? 500 : 400,
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={() => toggleOption(option)}
+                <MinusCircle size={12} />
+                {isExclusionMode ? 'Excluding mode' : 'Click to exclude'}
+              </button>
+            </div>
+          )}
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {options.map((option) => {
+              const isChecked = selected.includes(option);
+              const isExcluded = excluded.includes(option);
+              
+              return (
+                <label
+                  key={option}
                   style={{
-                    width: '16px',
-                    height: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontFamily: 'var(--font-secondary)',
+                    fontSize: '13px',
+                    color: isExcluded 
+                      ? 'rgb(220, 38, 38)' 
+                      : isChecked 
+                        ? '#000' 
+                        : 'rgba(0,0,0,0.7)',
                     cursor: 'pointer',
-                    accentColor: 'var(--accent)',
+                    padding: '4px 0',
+                    fontWeight: isChecked || isExcluded ? 500 : 400,
+                    textDecoration: isExcluded ? 'line-through' : 'none',
+                    transition: 'all 150ms ease',
                   }}
-                />
-                {option}
-              </label>
-            );
-          })}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked || isExcluded}
+                    onChange={() => toggleOption(option)}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      cursor: 'pointer',
+                      accentColor: isExcluded ? 'rgb(220, 38, 38)' : 'var(--accent)',
+                    }}
+                  />
+                  {option}
+                  {isExcluded && (
+                    <span style={{ fontSize: '10px', opacity: 0.7 }}>(excluded)</span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -184,13 +284,20 @@ function FilterGroup({ title, options, selected, onChange, defaultExpanded = fal
 export function FilterSidebar({ filters, onFilterChange, onClearFilters }: FilterSidebarProps) {
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   
+  // Count exclusions
+  const totalExclusions = 
+    (filters.exclude_typology?.length || 0) +
+    (filters.exclude_climate_bin?.length || 0) +
+    (filters.exclude_massing_type?.length || 0);
+  
   const hasActiveFilters =
     filters.typology.length > 0 ||
     filters.country.length > 0 ||
     filters.climate_bin.length > 0 ||
     filters.massing_type.length > 0 ||
     filters.tags.length > 0 ||
-    filters.architect.length > 0;
+    filters.architect.length > 0 ||
+    totalExclusions > 0;
 
   const totalActiveFilters =
     filters.typology.length +
@@ -258,6 +365,21 @@ export function FilterSidebar({ filters, onFilterChange, onClearFilters }: Filte
               {totalActiveFilters}
             </span>
           )}
+          {totalExclusions > 0 && (
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 500,
+                color: 'white',
+                backgroundColor: 'rgb(220, 38, 38)',
+                padding: '2px 8px',
+                borderRadius: '10px',
+              }}
+              title={`${totalExclusions} exclusion${totalExclusions > 1 ? 's' : ''}`}
+            >
+              -{totalExclusions}
+            </span>
+          )}
         </div>
         {hasActiveFilters && (
           <button
@@ -289,6 +411,9 @@ export function FilterSidebar({ filters, onFilterChange, onClearFilters }: Filte
         options={TYPOLOGY_OPTIONS}
         selected={filters.typology}
         onChange={(values) => updateFilter('typology', values)}
+        enableExclusion={true}
+        excluded={filters.exclude_typology || []}
+        onExcludedChange={(values) => updateFilter('exclude_typology', values)}
       />
       
       <FilterGroup
@@ -303,6 +428,9 @@ export function FilterSidebar({ filters, onFilterChange, onClearFilters }: Filte
         options={CLIMATE_OPTIONS}
         selected={filters.climate_bin}
         onChange={(values) => updateFilter('climate_bin', values)}
+        enableExclusion={true}
+        excluded={filters.exclude_climate_bin || []}
+        onExcludedChange={(values) => updateFilter('exclude_climate_bin', values)}
       />
       
       <FilterGroup
@@ -310,6 +438,9 @@ export function FilterSidebar({ filters, onFilterChange, onClearFilters }: Filte
         options={MASSING_OPTIONS}
         selected={filters.massing_type}
         onChange={(values) => updateFilter('massing_type', values)}
+        enableExclusion={true}
+        excluded={filters.exclude_massing_type || []}
+        onExcludedChange={(values) => updateFilter('exclude_massing_type', values)}
       />
       
       <FilterGroup

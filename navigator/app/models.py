@@ -7,9 +7,15 @@ class Weights(BaseModel):
     attr: float = Field(0.25, ge=0.0, le=1.0)
 
 class Filters(BaseModel):
+    # Inclusion filters (results must match these)
     typology: Optional[List[str]] = None
     climate_bin: Optional[List[str]] = None
     massing_type: Optional[List[str]] = None
+    # Exclusion filters (results must NOT match these)
+    exclude_typology: Optional[List[str]] = None
+    exclude_climate_bin: Optional[List[str]] = None
+    exclude_massing_type: Optional[List[str]] = None
+    exclude_project_ids: Optional[List[str]] = None
 
 class SearchRequest(BaseModel):
     # Provide either query_image_id or query_vector

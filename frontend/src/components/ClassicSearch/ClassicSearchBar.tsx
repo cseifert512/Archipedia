@@ -1,29 +1,53 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, X, Upload, Link as LinkIcon, ChevronDown, ChevronUp, Clock, Trash2, Search } from 'lucide-react';
+import { Camera, X, Upload, Link as LinkIcon, ChevronDown, ChevronUp, Clock, Trash2, Search, Plus, MinusCircle } from 'lucide-react';
 import { getHistory, removeFromHistory, formatTimestamp, type SearchHistoryItem } from '../../lib/searchHistory';
-import { getAutocomplete, type AutocompleteSuggestion } from '../../lib/navigatorApi';
+import { getAutocomplete, type AutocompleteSuggestion, type FusionMode } from '../../lib/navigatorApi';
 
 export type MatchEmphasis = 'visual' | 'balanced' | 'semantic';
+
+export interface MultiImageData {
+  files: File[];
+  negativeFiles: File[];
+  fusionMode: FusionMode;
+}
 
 interface ClassicSearchBarProps {
   initialQuery?: string;
   initialImageUrl?: string | null;
+  /** Legacy single-image callback (still supported for backward compatibility) */
   onSearch: (query: string, image: File | string | null, emphasis: MatchEmphasis) => void;
+  /** New multi-image callback (called when multiple images are uploaded) */
+  onMultiImageSearch?: (query: string, multiImageData: MultiImageData, emphasis: MatchEmphasis) => void;
   onClear: () => void;
   isSearching?: boolean;
+  /** Enable multi-image mode (default: true) */
+  enableMultiImage?: boolean;
+  /** Maximum number of positive images (default: 5) */
+  maxImages?: number;
 }
 
 export function ClassicSearchBar({
   initialQuery = '',
   initialImageUrl = null,
   onSearch,
+  onMultiImageSearch,
   onClear,
   isSearching = false,
+  enableMultiImage = true,
+  maxImages = 5,
 }: ClassicSearchBarProps) {
   const [query, setQuery] = useState(initialQuery);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  
+  // Multi-image state
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [negativeFiles, setNegativeFiles] = useState<File[]>([]);
+  const [negativePreviews, setNegativePreviews] = useState<string[]>([]);
+  const [fusionMode, setFusionMode] = useState<FusionMode>('average');
+  
+  // Legacy single-image state (for URL-based images)
   const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl);
-  const [imagePreview, setImagePreview] = useState<string | null>(initialImageUrl);
+  
   const [emphasis, setEmphasis] = useState<MatchEmphasis>('balanced');
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInputValue, setUrlInputValue] = useState('');
@@ -31,6 +55,7 @@ export function ClassicSearchBar({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<SearchHistoryItem[]>([]);
+  const [showNegativeZone, setShowNegativeZone] = useState(false);
   
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([]);
@@ -38,6 +63,7 @@ export function ClassicSearchBar({
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const negativeFileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Load history when dropdown opens
@@ -77,11 +103,13 @@ export function ClassicSearchBar({
     return () => clearTimeout(timer);
   }, [query, showHistory]);
 
-  const hasImage = imageFile || imageUrl;
+  const hasImage = imageFiles.length > 0 || imageUrl;
+  const hasMultipleImages = imageFiles.length > 1;
   const hasQuery = query.trim().length > 0;
   const showEmphasisControl = hasImage && hasQuery;
+  const canAddMoreImages = imageFiles.length < maxImages;
 
-  const handleFileSelect = useCallback((file: File) => {
+  const handleFileSelect = useCallback((file: File, isNegative: boolean = false) => {
     if (!file.type.match(/^image\/(jpeg|png|jpg)$/)) {
       alert('Please select a JPG or PNG image');
       return;
@@ -90,35 +118,76 @@ export function ClassicSearchBar({
       alert('Image must be less than 10MB');
       return;
     }
-    setImageFile(file);
-    setImageUrl(null);
-    setImagePreview(URL.createObjectURL(file));
-  }, []);
+    
+    if (isNegative) {
+      if (negativeFiles.length >= 3) {
+        alert('Maximum 3 negative reference images allowed');
+        return;
+      }
+      setNegativeFiles(prev => [...prev, file]);
+      setNegativePreviews(prev => [...prev, URL.createObjectURL(file)]);
+    } else {
+      if (imageFiles.length >= maxImages) {
+        alert(`Maximum ${maxImages} reference images allowed`);
+        return;
+      }
+      setImageFiles(prev => [...prev, file]);
+      setImagePreviews(prev => [...prev, URL.createObjectURL(file)]);
+      setImageUrl(null); // Clear URL when adding files
+    }
+  }, [imageFiles.length, negativeFiles.length, maxImages]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFileSelect(file);
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach(file => handleFileSelect(file, false));
+    }
+  };
+  
+  const handleNegativeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach(file => handleFileSelect(file, true));
+    }
+  };
+  
+  const removeImageAtIndex = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => {
+      const toRevoke = prev[index];
+      if (toRevoke) URL.revokeObjectURL(toRevoke);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+  
+  const removeNegativeAtIndex = (index: number) => {
+    setNegativeFiles(prev => prev.filter((_, i) => i !== index));
+    setNegativePreviews(prev => {
+      const toRevoke = prev[index];
+      if (toRevoke) URL.revokeObjectURL(toRevoke);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   // Fetch an image from URL and convert to File for search
-  const fetchAndSetImage = useCallback(async (url: string, imageName?: string) => {
+  const fetchAndSetImage = useCallback(async (url: string, imageName?: string, isNegative: boolean = false) => {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch image');
       const blob = await response.blob();
       const filename = imageName ? `${imageName}.jpg` : 'dropped-image.jpg';
       const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
-      handleFileSelect(file);
+      handleFileSelect(file, isNegative);
     } catch (error) {
       console.error('Failed to fetch image from URL:', error);
-      // Fallback: just use the URL directly
-      setImageUrl(url);
-      setImageFile(null);
-      setImagePreview(url);
+      // Fallback: just use the URL directly (only for positive images)
+      if (!isNegative) {
+        setImageUrl(url);
+      }
     }
   }, [handleFileSelect]);
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent, isNegativeZone: boolean = false) => {
     e.preventDefault();
     setIsDragging(false);
     
@@ -127,7 +196,7 @@ export function ClassicSearchBar({
     if (imageData) {
       try {
         const { url, image_id } = JSON.parse(imageData);
-        await fetchAndSetImage(url, image_id);
+        await fetchAndSetImage(url, image_id, isNegativeZone);
         return;
       } catch (err) {
         console.error('Failed to parse dropped image data:', err);
@@ -137,13 +206,15 @@ export function ClassicSearchBar({
     // Check for URL drag (text/uri-list)
     const urlData = e.dataTransfer.getData('text/uri-list');
     if (urlData && urlData.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i)) {
-      await fetchAndSetImage(urlData);
+      await fetchAndSetImage(urlData, undefined, isNegativeZone);
       return;
     }
     
-    // Existing file drop logic
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleFileSelect(file);
+    // File drop logic - support multiple files
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach(file => handleFileSelect(file, isNegativeZone));
+    }
   }, [handleFileSelect, fetchAndSetImage]);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -168,24 +239,46 @@ export function ClassicSearchBar({
     }
   };
 
-  const removeImage = () => {
-    setImageFile(null);
+  const removeAllImages = () => {
+    // Revoke all preview URLs
+    imagePreviews.forEach(url => URL.revokeObjectURL(url));
+    negativePreviews.forEach(url => URL.revokeObjectURL(url));
+    
+    setImageFiles([]);
+    setImagePreviews([]);
+    setNegativeFiles([]);
+    setNegativePreviews([]);
     setImageUrl(null);
-    setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    if (negativeFileInputRef.current) {
+      negativeFileInputRef.current.value = '';
     }
   };
 
   const handleSearch = () => {
     if (!hasQuery && !hasImage) return;
-    onSearch(query, imageFile || imageUrl, emphasis);
+    
+    // Use multi-image callback if multiple images and callback provided
+    if (imageFiles.length > 0 && onMultiImageSearch && (imageFiles.length > 1 || negativeFiles.length > 0)) {
+      onMultiImageSearch(query, {
+        files: imageFiles,
+        negativeFiles: negativeFiles,
+        fusionMode: fusionMode,
+      }, emphasis);
+    } else {
+      // Fall back to legacy single-image callback
+      onSearch(query, imageFiles[0] || imageUrl, emphasis);
+    }
   };
 
   const handleClear = () => {
     setQuery('');
-    removeImage();
+    removeAllImages();
     setEmphasis('balanced');
+    setFusionMode('average');
+    setShowNegativeZone(false);
     onClear();
   };
 
@@ -244,14 +337,22 @@ export function ClassicSearchBar({
     setShowSuggestions(false);
     setSuggestions([]);
     // Trigger search with the selected suggestion
-    onSearch(suggestion.value, imageFile || imageUrl, emphasis);
+    if (imageFiles.length > 0 && onMultiImageSearch && (imageFiles.length > 1 || negativeFiles.length > 0)) {
+      onMultiImageSearch(suggestion.value, { files: imageFiles, negativeFiles, fusionMode }, emphasis);
+    } else {
+      onSearch(suggestion.value, imageFiles[0] || imageUrl, emphasis);
+    }
   };
 
   const handleHistorySelect = (item: SearchHistoryItem) => {
     setQuery(item.query);
     setShowHistory(false);
     // Trigger search with the history item
-    onSearch(item.query, imageFile || imageUrl, emphasis);
+    if (imageFiles.length > 0 && onMultiImageSearch && (imageFiles.length > 1 || negativeFiles.length > 0)) {
+      onMultiImageSearch(item.query, { files: imageFiles, negativeFiles, fusionMode }, emphasis);
+    } else {
+      onSearch(item.query, imageFiles[0] || imageUrl, emphasis);
+    }
   };
 
   const handleRemoveHistoryItem = (e: React.MouseEvent, queryText: string) => {
@@ -275,43 +376,46 @@ export function ClassicSearchBar({
         ref={fileInputRef}
         type="file"
         accept="image/jpeg,image/png,image/jpg"
+        multiple={enableMultiImage}
         onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={negativeFileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/jpg"
+        multiple
+        onChange={handleNegativeFileChange}
         style={{ display: 'none' }}
       />
 
       {/* Main Search Row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        {/* Image Upload Zone */}
+        {/* Multi-Image Upload Zone */}
         <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onClick={() => !hasImage && fileInputRef.current?.click()}
           style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '8px',
-            border: isDragging
-              ? '2px dashed var(--accent)'
-              : hasImage
-              ? '2px solid rgba(0,0,0,0.1)'
-              : '2px dashed rgba(0,0,0,0.2)',
-            backgroundColor: isDragging ? 'rgba(182, 68, 36, 0.05)' : 'rgba(0,0,0,0.02)',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: hasImage ? 'default' : 'pointer',
+            gap: '8px',
             flexShrink: 0,
-            position: 'relative',
-            overflow: 'hidden',
-            transition: 'all 150ms ease',
+            alignItems: 'center',
           }}
         >
-          {imagePreview ? (
-            <>
+          {/* Existing images grid */}
+          {imagePreviews.map((preview, index) => (
+            <div
+              key={`img-${index}`}
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '8px',
+                border: '2px solid rgba(0,0,0,0.1)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
               <img
-                src={imagePreview}
-                alt="Reference"
+                src={preview}
+                alt={`Reference ${index + 1}`}
                 style={{
                   width: '100%',
                   height: '100%',
@@ -321,14 +425,14 @@ export function ClassicSearchBar({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  removeImage();
+                  removeImageAtIndex(index);
                 }}
                 style={{
                   position: 'absolute',
-                  top: '4px',
-                  right: '4px',
-                  width: '20px',
-                  height: '20px',
+                  top: '2px',
+                  right: '2px',
+                  width: '18px',
+                  height: '18px',
                   borderRadius: '50%',
                   backgroundColor: 'rgba(0,0,0,0.7)',
                   border: 'none',
@@ -339,26 +443,175 @@ export function ClassicSearchBar({
                   cursor: 'pointer',
                 }}
               >
-                <X size={12} />
+                <X size={10} />
               </button>
-            </>
-          ) : (
-            <div style={{ textAlign: 'center' }}>
-              <Camera size={24} style={{ opacity: 0.4 }} />
-              <div
+              {index === 0 && imageFiles.length > 1 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '2px',
+                    left: '2px',
+                    fontSize: '8px',
+                    backgroundColor: 'var(--accent)',
+                    color: 'white',
+                    padding: '1px 4px',
+                    borderRadius: '3px',
+                  }}
+                >
+                  Primary
+                </div>
+              )}
+            </div>
+          ))}
+          
+          {/* URL-based image (legacy) */}
+          {imageUrl && imagePreviews.length === 0 && (
+            <div
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '8px',
+                border: '2px solid rgba(0,0,0,0.1)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              <img
+                src={imageUrl}
+                alt="Reference"
                 style={{
-                  fontFamily: 'var(--font-secondary)',
-                  fontSize: '9px',
-                  color: 'rgba(0,0,0,0.4)',
-                  marginTop: '4px',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+              />
+              <button
+                onClick={() => setImageUrl(null)}
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  right: '2px',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  border: 'none',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
                 }}
               >
-                Drop image
+                <X size={10} />
+              </button>
+            </div>
+          )}
+          
+          {/* Add more images button */}
+          {canAddMoreImages && (
+            <div
+              onDrop={(e) => handleDrop(e, false)}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                width: imagePreviews.length > 0 ? '60px' : '80px',
+                height: imagePreviews.length > 0 ? '60px' : '80px',
+                borderRadius: '8px',
+                border: isDragging
+                  ? '2px dashed var(--accent)'
+                  : '2px dashed rgba(0,0,0,0.2)',
+                backgroundColor: isDragging ? 'rgba(182, 68, 36, 0.05)' : 'rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+              }}
+            >
+              {imagePreviews.length > 0 ? (
+                <Plus size={20} style={{ opacity: 0.4 }} />
+              ) : (
+                <>
+                  <Camera size={24} style={{ opacity: 0.4 }} />
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-secondary)',
+                      fontSize: '9px',
+                      color: 'rgba(0,0,0,0.4)',
+                      marginTop: '4px',
+                    }}
+                  >
+                    Drop image
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          
+          {/* Negative images indicator */}
+          {negativePreviews.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '8px' }}>
+              <div style={{ width: '1px', height: '40px', backgroundColor: 'rgba(0,0,0,0.1)' }} />
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {negativePreviews.map((preview, index) => (
+                  <div
+                    key={`neg-${index}`}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '6px',
+                      border: '2px solid rgba(220, 38, 38, 0.5)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <img
+                      src={preview}
+                      alt={`Exclude ${index + 1}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        opacity: 0.6,
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'linear-gradient(45deg, transparent 45%, rgba(220,38,38,0.3) 45%, rgba(220,38,38,0.3) 55%, transparent 55%)',
+                      }}
+                    />
+                    <button
+                      onClick={() => removeNegativeAtIndex(index)}
+                      style={{
+                        position: 'absolute',
+                        top: '1px',
+                        right: '1px',
+                        width: '14px',
+                        height: '14px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(220, 38, 38, 0.8)',
+                        border: 'none',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <X size={8} />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
         </div>
-
+        
         {/* Text Input */}
         <div style={{ flex: 1, position: 'relative' }}>
           <input
@@ -806,29 +1059,174 @@ export function ClassicSearchBar({
               fontFamily: 'var(--font-secondary)',
               fontSize: '11px',
               color: 'rgba(0,0,0,0.4)',
-              marginBottom: '8px',
+              marginBottom: '12px',
             }}
           >
-            Advanced controls (coming soon)
+            Multi-Image Search Controls
           </div>
+          
+          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+            {/* Fusion Mode */}
+            {hasMultipleImages && (
+              <div>
+                <label
+                  style={{
+                    fontFamily: 'var(--font-secondary)',
+                    fontSize: '11px',
+                    color: 'rgba(0,0,0,0.6)',
+                    display: 'block',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Fusion Mode
+                </label>
+                <div
+                  style={{
+                    display: 'flex',
+                    backgroundColor: 'rgba(0,0,0,0.05)',
+                    borderRadius: '6px',
+                    padding: '2px',
+                  }}
+                >
+                  {([
+                    { value: 'average', label: 'Match All' },
+                    { value: 'max_pool', label: 'Match Any' },
+                  ] as const).map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setFusionMode(option.value)}
+                      style={{
+                        fontFamily: 'var(--font-secondary)',
+                        fontSize: '11px',
+                        padding: '5px 12px',
+                        backgroundColor: fusionMode === option.value ? 'white' : 'transparent',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        color: fusionMode === option.value ? '#000' : 'rgba(0,0,0,0.5)',
+                        boxShadow: fusionMode === option.value ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        transition: 'all 150ms ease',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Negative Images */}
+            <div>
+              <label
+                style={{
+                  fontFamily: 'var(--font-secondary)',
+                  fontSize: '11px',
+                  color: 'rgba(0,0,0,0.6)',
+                  display: 'block',
+                  marginBottom: '6px',
+                }}
+              >
+                Exclude Images (avoid similar results)
+              </label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {negativePreviews.map((preview, index) => (
+                  <div
+                    key={`neg-adv-${index}`}
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '6px',
+                      border: '2px solid rgba(220, 38, 38, 0.5)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <img
+                      src={preview}
+                      alt={`Exclude ${index + 1}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        opacity: 0.7,
+                      }}
+                    />
+                    <button
+                      onClick={() => removeNegativeAtIndex(index)}
+                      style={{
+                        position: 'absolute',
+                        top: '2px',
+                        right: '2px',
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(220, 38, 38, 0.8)',
+                        border: 'none',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+                {negativeFiles.length < 3 && (
+                  <button
+                    onClick={() => negativeFileInputRef.current?.click()}
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '6px',
+                      border: '2px dashed rgba(220, 38, 38, 0.3)',
+                      backgroundColor: 'rgba(220, 38, 38, 0.02)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 150ms ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(220, 38, 38, 0.5)';
+                      e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(220, 38, 38, 0.3)';
+                      e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.02)';
+                    }}
+                  >
+                    <MinusCircle size={16} style={{ color: 'rgba(220, 38, 38, 0.5)' }} />
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-secondary)',
+                        fontSize: '8px',
+                        color: 'rgba(220, 38, 38, 0.6)',
+                        marginTop: '2px',
+                      }}
+                    >
+                      Exclude
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Info text */}
           <div
             style={{
-              display: 'flex',
-              gap: '16px',
-              opacity: 0.5,
-              pointerEvents: 'none',
+              fontFamily: 'var(--font-secondary)',
+              fontSize: '10px',
+              color: 'rgba(0,0,0,0.4)',
+              marginTop: '12px',
             }}
           >
-            <div>
-              <label style={{ fontFamily: 'var(--font-secondary)', fontSize: '11px' }}>
-                Fusion Weights
-              </label>
-            </div>
-            <div>
-              <label style={{ fontFamily: 'var(--font-secondary)', fontSize: '11px' }}>
-                Search Mode
-              </label>
-            </div>
+            {hasMultipleImages
+              ? 'Using multiple reference images. Fusion mode controls how they are combined.'
+              : 'Add more images above for multi-image search. Drag and drop from search results.'}
           </div>
         </div>
       )}

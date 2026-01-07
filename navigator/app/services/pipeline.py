@@ -77,16 +77,28 @@ class Pipeline:
         normalized = (arr - d_min) / (d_max - d_min)
         return normalized.tolist()
     
+    def _has_any_filters(self, filters: Filters) -> bool:
+        """Check if any inclusion or exclusion filters are set."""
+        if not filters:
+            return False
+        # Check inclusion filters
+        if filters.typology or filters.climate_bin or filters.massing_type:
+            return True
+        # Check exclusion filters
+        if filters.exclude_typology or filters.exclude_climate_bin or filters.exclude_massing_type or filters.exclude_project_ids:
+            return True
+        return False
+    
     def _apply_filters(self, indices: List[int], distances: List[float], filters: Filters) -> Tuple[List[int], List[float]]:
-        """Apply attribute filters to candidates."""
-        if not filters or (not filters.typology and not filters.climate_bin and not filters.massing_type):
+        """Apply inclusion and exclusion attribute filters to candidates."""
+        if not self._has_any_filters(filters):
             return indices, distances
         
         # Convert indices to project IDs using batch lookup
         project_ids_batch = self.index_store.get_project_ids_batch(indices)
         project_ids = [pid for pid in project_ids_batch if pid is not None]
         
-        # Apply filters
+        # Apply inclusion filters
         filter_dict = {}
         if filters.typology:
             filter_dict['typology'] = filters.typology
@@ -95,7 +107,44 @@ class Pipeline:
         if filters.massing_type:
             filter_dict['massing_type'] = filters.massing_type
         
-        filtered_project_ids = set(self.attribute_features.apply_filters(project_ids, filter_dict))
+        # Get project attributes for exclusion filtering
+        project_attrs = {}
+        for pid in project_ids:
+            attrs = self.attribute_features._get_project_attributes(pid)
+            if attrs:
+                project_attrs[pid] = attrs
+        
+        # Start with all projects if no inclusion filters, else apply inclusion filters
+        if filter_dict:
+            filtered_project_ids = set(self.attribute_features.apply_filters(project_ids, filter_dict))
+        else:
+            filtered_project_ids = set(project_ids)
+        
+        # Apply exclusion filters
+        if filters.exclude_typology:
+            exclude_set = set(filters.exclude_typology)
+            filtered_project_ids = {
+                pid for pid in filtered_project_ids
+                if project_attrs.get(pid, {}).get('typology') not in exclude_set
+            }
+        
+        if filters.exclude_climate_bin:
+            exclude_set = set(filters.exclude_climate_bin)
+            filtered_project_ids = {
+                pid for pid in filtered_project_ids
+                if project_attrs.get(pid, {}).get('climate_bin') not in exclude_set
+            }
+        
+        if filters.exclude_massing_type:
+            exclude_set = set(filters.exclude_massing_type)
+            filtered_project_ids = {
+                pid for pid in filtered_project_ids
+                if project_attrs.get(pid, {}).get('massing_type') not in exclude_set
+            }
+        
+        if filters.exclude_project_ids:
+            exclude_set = set(filters.exclude_project_ids)
+            filtered_project_ids -= exclude_set
         
         # Filter indices and distances using the already-fetched batch
         filtered_indices = []

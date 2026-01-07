@@ -364,6 +364,148 @@ export async function searchHybrid(options: {
   return (await res.json()) as NavigatorHybridSearchResponse;
 }
 
+// ---- Multi-Image Search ----
+
+export type FusionMode = 'average' | 'weighted' | 'max_pool';
+
+export interface MultiImageSearchOptions {
+  /** Fusion strategy for combining image embeddings */
+  fusionMode?: FusionMode;
+  /** Weights for each image (for 'weighted' mode, must match files.length) */
+  imageWeights?: number[];
+  /** Negative reference images to avoid (0-3) */
+  negativeFiles?: File[];
+  /** Weight for negative image influence (0-1) */
+  negWeight?: number;
+  /** Number of results to return */
+  topK?: number;
+  /** Page number (1-indexed) */
+  page?: number;
+  /** Results per page */
+  pageSize?: number;
+  /** Visual weight */
+  wVisual?: number;
+  /** Attribute weight */
+  wAttr?: number;
+  /** Spatial weight */
+  wSpatial?: number;
+  /** Typologies to exclude */
+  excludeTypology?: string[];
+  /** Climate bins to exclude */
+  excludeClimateBin?: string[];
+  /** Project IDs to exclude */
+  excludeProjectIds?: string[];
+}
+
+export interface MultiImageSearchResponse extends NavigatorSearchFileResponse {
+  debug?: {
+    positive_images?: number;
+    negative_images?: number;
+    fusion_mode?: string;
+    exclusions?: {
+      typology?: string[];
+      climate_bin?: string[];
+      project_ids?: string[];
+    };
+    [key: string]: any;
+  };
+}
+
+/**
+ * Search using multiple reference images with embedding fusion.
+ * 
+ * @param files - 1-5 positive reference images
+ * @param options - Search options including fusion mode, negative images, exclusions
+ * @returns Promise with search results
+ * 
+ * @example
+ * // Find projects similar to ALL uploaded images
+ * const results = await searchByMultipleImages(files, { fusionMode: 'average' });
+ * 
+ * @example
+ * // Find projects similar to images but NOT museums
+ * const results = await searchByMultipleImages(files, {
+ *   excludeTypology: ['Museum', 'Gallery']
+ * });
+ * 
+ * @example
+ * // Find projects similar to these images but NOT like this other image
+ * const results = await searchByMultipleImages(positiveFiles, {
+ *   negativeFiles: [unwantedImage],
+ *   negWeight: 0.4
+ * });
+ */
+export async function searchByMultipleImages(
+  files: File[],
+  options?: MultiImageSearchOptions
+): Promise<MultiImageSearchResponse> {
+  const base = getApiBaseUrl();
+  
+  if (files.length < 1 || files.length > 5) {
+    throw new SearchError(
+      `Expected 1-5 images, got ${files.length}`,
+      'invalid_image_count',
+      'Upload between 1 and 5 reference images'
+    );
+  }
+  
+  const params = new URLSearchParams();
+  params.set("fusion_mode", options?.fusionMode ?? "average");
+  params.set("top_k", String(options?.topK ?? 50));
+  params.set("page", String(options?.page ?? 1));
+  params.set("page_size", String(options?.pageSize ?? 12));
+  params.set("w_visual", String(options?.wVisual ?? 1.0));
+  params.set("w_attr", String(options?.wAttr ?? 0.0));
+  params.set("w_spatial", String(options?.wSpatial ?? 0.0));
+  
+  if (options?.negWeight !== undefined) {
+    params.set("neg_weight", String(options.negWeight));
+  }
+  
+  if (options?.imageWeights && options.imageWeights.length === files.length) {
+    params.set("image_weights", options.imageWeights.join(","));
+  }
+  
+  // Exclusion filters
+  if (options?.excludeTypology && options.excludeTypology.length > 0) {
+    params.set("exclude_typology", options.excludeTypology.join(","));
+  }
+  if (options?.excludeClimateBin && options.excludeClimateBin.length > 0) {
+    params.set("exclude_climate_bin", options.excludeClimateBin.join(","));
+  }
+  if (options?.excludeProjectIds && options.excludeProjectIds.length > 0) {
+    params.set("exclude_project_ids", options.excludeProjectIds.join(","));
+  }
+  
+  const form = new FormData();
+  
+  // Append positive files
+  files.forEach((file) => {
+    form.append("files", file);
+  });
+  
+  // Append negative files if provided
+  if (options?.negativeFiles && options.negativeFiles.length > 0) {
+    options.negativeFiles.forEach((file) => {
+      form.append("negative_files", file);
+    });
+  }
+  
+  const res = await fetch(`${base}/search/multi-image?${params.toString()}`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeader(),
+    },
+    body: form,
+  });
+  
+  if (!res.ok) {
+    throw await parseErrorResponse(res);
+  }
+  
+  return (await res.json()) as MultiImageSearchResponse;
+}
+
 // ---- Autocomplete ----
 
 export interface AutocompleteSuggestion {

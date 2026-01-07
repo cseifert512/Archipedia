@@ -7,6 +7,7 @@ import {
   SearchResultCard,
   BoardDrawer,
   type MatchEmphasis,
+  type MultiImageData,
   type FilterState,
   type SearchResultData,
   type ProjectImage,
@@ -15,7 +16,7 @@ import { HamburgerMenu } from '../components/HamburgerMenu';
 import { useBoardStore } from '../stores/boardStore';
 import { mockProjects } from '../lib/mockData';
 import { toast } from 'sonner';
-import { searchByText, searchByImageFile, searchHybrid, toAbsoluteUrl, SearchError } from '../lib/navigatorApi';
+import { searchByText, searchByImageFile, searchHybrid, searchByMultipleImages, toAbsoluteUrl, SearchError } from '../lib/navigatorApi';
 import { addToHistory } from '../lib/searchHistory';
 
 type SortOption = 'best' | 'visual' | 'semantic';
@@ -28,6 +29,11 @@ const EMPTY_FILTERS: FilterState = {
   tags: [],
   architect: [],
   wwr_band: [],
+  // Exclusion filters
+  exclude_typology: [],
+  exclude_climate_bin: [],
+  exclude_massing_type: [],
+  exclude_project_ids: [],
 };
 
 export function ClassicSearchPage() {
@@ -43,6 +49,7 @@ export function ClassicSearchPage() {
   // Search state
   const [query, setQuery] = useState(initialQuery);
   const [uploadedImage, setUploadedImage] = useState<File | string | null>(null);
+  const [multiImageData, setMultiImageData] = useState<MultiImageData | null>(null);
   const [emphasis, setEmphasis] = useState<MatchEmphasis>(initialEmphasis);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(!!initialQuery);
@@ -265,6 +272,117 @@ export function ClassicSearchPage() {
     []
   );
 
+  // Perform multi-image search
+  const performMultiImageSearch = useCallback(
+    async (
+      searchQuery: string,
+      imageData: MultiImageData,
+      searchEmphasis: MatchEmphasis
+    ) => {
+      if (imageData.files.length === 0 && !searchQuery.trim()) return;
+
+      setIsSearching(true);
+      setHasSearched(true);
+      setSearchError(null);
+      setQuery(searchQuery);
+      setMultiImageData(imageData);
+      setUploadedImage(null); // Clear single image
+      setEmphasis(searchEmphasis);
+      setCurrentPage(1);
+
+      try {
+        const response = await searchByMultipleImages(imageData.files, {
+          fusionMode: imageData.fusionMode,
+          negativeFiles: imageData.negativeFiles,
+          topK: 50,
+          page: 1,
+          pageSize: PAGE_SIZE,
+          wVisual: searchEmphasis === 'visual' ? 1.0 : searchEmphasis === 'semantic' ? 0.3 : 0.7,
+          wAttr: searchEmphasis === 'semantic' ? 0.5 : 0.25,
+        });
+
+        const apiResults = response.results || [];
+        const apiHasMore = response.has_more ?? false;
+        const apiTotalCount = response.total_count ?? apiResults.length;
+        
+        setHasMore(apiHasMore);
+        setTotalCount(apiTotalCount);
+
+        // Transform results
+        const transformedResults: SearchResultData[] = apiResults.map((result, index) => {
+          const score = result.score ?? (1 - (result.distance ?? 0.5));
+          const thumbUrl = toAbsoluteUrl(result.thumb_url) || '';
+
+          let projectImages: ProjectImage[] = [];
+          if (result.image_urls && Array.isArray(result.image_urls) && result.image_urls.length > 0) {
+            projectImages = result.image_urls.map((url: string, idx: number) => ({
+              image_id: `img_${result.project_id}_${idx}`,
+              thumb_url: url,
+              image_url: url,
+            }));
+          } else if (thumbUrl) {
+            projectImages = [
+              {
+                image_id: result.image_id || `img_${result.project_id}_01`,
+                thumb_url: thumbUrl,
+                image_url: thumbUrl,
+              },
+            ];
+          }
+
+          const fusionLabel = imageData.files.length > 1
+            ? (imageData.fusionMode === 'average' ? 'Multi-image (all)' : 'Multi-image (any)')
+            : 'Visual similarity';
+
+          return {
+            project_id: result.project_id || `project-${index}`,
+            project_title: result.title || result.project_id || 'Unknown Project',
+            architect: result.architect || 'Unknown Architect',
+            location_display: result.country || 'Unknown Location',
+            year: result.year || 2024,
+            image_id: result.image_id || `img_${result.project_id}_01`,
+            thumb_url: projectImages[0]?.thumb_url || thumbUrl,
+            image_url: projectImages[0]?.image_url || thumbUrl,
+            images: projectImages,
+            score: score,
+            match_reason: result.match_reason || fusionLabel,
+            badges: {
+              typology: result.typology ? [result.typology] : [],
+              country: result.country ? [result.country] : [],
+              climate_bin: result.climate_bin ? [result.climate_bin] : [],
+            },
+          };
+        });
+
+        setResults(transformedResults);
+        
+        // Record to history
+        const historyText = searchQuery || `${imageData.files.length} images`;
+        addToHistory(historyText, true, transformedResults.length);
+        
+        if (imageData.negativeFiles.length > 0) {
+          toast.success(`Found ${transformedResults.length} results (excluding ${imageData.negativeFiles.length} negative reference${imageData.negativeFiles.length > 1 ? 's' : ''})`);
+        }
+      } catch (error) {
+        console.error('Multi-image search failed:', error);
+        
+        if (error instanceof SearchError) {
+          setSearchError({
+            message: error.message,
+            suggestion: error.suggestion,
+          });
+          setResults([]);
+        } else {
+          toast.error('Multi-image search failed. Please try again.');
+          setResults([]);
+        }
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    []
+  );
+
   // Sort results (filtering is done server-side to avoid duplicate work)
   const sortedResults = useMemo(() => {
     const sorted = [...results];
@@ -380,9 +498,14 @@ export function ClassicSearchPage() {
     performSearch(q, image, emp);
   };
 
+  const handleMultiImageSearch = (q: string, imageData: MultiImageData, emp: MatchEmphasis) => {
+    performMultiImageSearch(q, imageData, emp);
+  };
+
   const handleClearSearch = () => {
     setQuery('');
     setUploadedImage(null);
+    setMultiImageData(null);
     setResults([]);
     setHasSearched(false);
     setCurrentPage(1);
@@ -508,8 +631,10 @@ export function ClassicSearchPage() {
             <ClassicSearchBar
               initialQuery={query}
               onSearch={handleSearch}
+              onMultiImageSearch={handleMultiImageSearch}
               onClear={handleClearSearch}
               isSearching={isSearching}
+              enableMultiImage={true}
             />
           </div>
 

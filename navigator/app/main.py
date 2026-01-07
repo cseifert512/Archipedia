@@ -1712,6 +1712,252 @@ async def upload_explore(
         "debug": {**debug_info, "fusion_latency_ms": fusion_ms},
     }
 
+# ---- Multi-Image Search ----
+
+def fuse_embeddings(embeddings: List[np.ndarray], mode: str = "average", weights: Optional[List[float]] = None) -> np.ndarray:
+    """Combine multiple image embeddings into a single query vector.
+    
+    Args:
+        embeddings: List of image embedding vectors (each shape: (dim,))
+        mode: Fusion strategy - "average", "weighted", or "max_pool"
+        weights: Optional weights for "weighted" mode (must sum to 1)
+    
+    Returns:
+        Fused embedding vector, L2-normalized
+    """
+    if len(embeddings) == 1:
+        return embeddings[0]
+    
+    stacked = np.stack(embeddings, axis=0)  # Shape: (n_images, dim)
+    
+    if mode == "average":
+        # Simple average - finds projects similar to "all" images
+        fused = np.mean(stacked, axis=0)
+    elif mode == "weighted" and weights is not None:
+        # Weighted average - user controls importance of each image
+        weights_arr = np.array(weights).reshape(-1, 1)
+        fused = np.sum(stacked * weights_arr, axis=0)
+    elif mode == "max_pool":
+        # Max pooling - preserves strongest features from any image
+        fused = np.max(stacked, axis=0)
+    else:
+        # Default to average
+        fused = np.mean(stacked, axis=0)
+    
+    # L2-normalize the result
+    return l2n(fused.reshape(1, -1))[0]
+
+
+def fuse_with_negatives(positive_embs: List[np.ndarray], negative_embs: List[np.ndarray], 
+                        neg_weight: float = 0.3) -> np.ndarray:
+    """Combine positive embeddings while moving away from negative embeddings.
+    
+    Args:
+        positive_embs: List of positive (desired) image embeddings
+        negative_embs: List of negative (avoid) image embeddings
+        neg_weight: How strongly to push away from negatives (0-1)
+    
+    Returns:
+        Fused embedding that emphasizes positives and avoids negatives
+    """
+    pos_centroid = np.mean(np.stack(positive_embs, axis=0), axis=0)
+    
+    if not negative_embs:
+        return l2n(pos_centroid.reshape(1, -1))[0]
+    
+    neg_centroid = np.mean(np.stack(negative_embs, axis=0), axis=0)
+    
+    # Move away from negative centroid
+    combined = pos_centroid - neg_weight * neg_centroid
+    
+    return l2n(combined.reshape(1, -1))[0]
+
+
+@app.post("/search/multi-image")
+async def search_multi_image(
+    files: List[UploadFile] = File(..., description="1-5 positive reference images"),
+    negative_files: List[UploadFile] = File(default=[], description="0-3 negative reference images to avoid"),
+    fusion_mode: str = Query("average", description="Fusion strategy: average, weighted, max_pool"),
+    image_weights: Optional[str] = Query(None, description="Comma-separated weights for weighted mode"),
+    neg_weight: float = Query(0.3, ge=0.0, le=1.0, description="Weight for negative image influence"),
+    top_k: int = Query(50, ge=1, le=200),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(12, ge=1, le=50),
+    typology: Optional[str] = None,
+    climate_bin: Optional[str] = None,
+    massing_type: Optional[str] = None,
+    exclude_typology: Optional[str] = Query(None, description="Comma-separated typologies to exclude"),
+    exclude_climate_bin: Optional[str] = Query(None, description="Comma-separated climate bins to exclude"),
+    exclude_project_ids: Optional[str] = Query(None, description="Comma-separated project IDs to exclude"),
+    w_visual: float = 1.0,
+    w_attr: float = 0.25,
+    w_spatial: float = 0.0,
+    strict: bool = False,
+    _: bool = Depends(require_token),
+):
+    """
+    Search using multiple reference images with embedding fusion.
+    
+    Supports:
+    - 1-5 positive images combined via fusion_mode (average, weighted, max_pool)
+    - 0-3 negative images to move results away from
+    - Exclusion filters for typology, climate, and specific projects
+    """
+    # Validate input counts
+    if len(files) < 1 or len(files) > 5:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_image_count",
+                "message": f"Expected 1-5 images, got {len(files)}",
+                "suggestion": "Upload between 1 and 5 reference images"
+            }
+        )
+    
+    if len(negative_files) > 3:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "too_many_negative_images",
+                "message": f"Maximum 3 negative images allowed, got {len(negative_files)}",
+                "suggestion": "Upload at most 3 negative reference images"
+            }
+        )
+    
+    st = get_store()
+    t_start = time.time()
+    
+    # Embed all positive images
+    positive_embeddings = []
+    for i, file in enumerate(files):
+        try:
+            pil = Image.open(file.file)
+            pil = downsample_pil(pil)
+            emb = embed_pil(pil)
+            positive_embeddings.append(emb)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_image",
+                    "message": f"Failed to process image {i+1}: {str(e)[:100]}",
+                    "suggestion": "Ensure all files are valid JPG or PNG images"
+                }
+            )
+    
+    # Embed negative images if provided
+    negative_embeddings = []
+    for i, file in enumerate(negative_files):
+        try:
+            pil = Image.open(file.file)
+            pil = downsample_pil(pil)
+            emb = embed_pil(pil)
+            negative_embeddings.append(emb)
+        except Exception:
+            # Skip invalid negative images silently
+            pass
+    
+    embed_ms = int((time.time() - t_start) * 1000)
+    
+    # Parse weights for weighted mode
+    parsed_weights = None
+    if fusion_mode == "weighted" and image_weights:
+        try:
+            parsed_weights = [float(w.strip()) for w in image_weights.split(",")]
+            if len(parsed_weights) != len(positive_embeddings):
+                parsed_weights = None  # Fallback to average
+        except ValueError:
+            parsed_weights = None
+    
+    # Fuse embeddings
+    if negative_embeddings:
+        # First fuse positives, then combine with negatives
+        pos_fused = fuse_embeddings(positive_embeddings, fusion_mode, parsed_weights)
+        query_vector = fuse_with_negatives([pos_fused], negative_embeddings, neg_weight)
+    else:
+        query_vector = fuse_embeddings(positive_embeddings, fusion_mode, parsed_weights)
+    
+    # Perform search
+    t_search = time.time()
+    D, I = st.search(query_vector, top_k * 3)  # Get more for filtering
+    search_ms = int((time.time() - t_search) * 1000)
+    
+    hydrated = st.results_payload(D, I)
+    
+    # Build filters with exclusions
+    f = Filters(typology=typology, climate_bin=climate_bin, massing_type=massing_type)
+    w = Weights(visual=w_visual, attr=w_attr, spatial=w_spatial)
+    
+    # Parse exclusion lists
+    exclude_typology_list = [t.strip() for t in (exclude_typology or "").split(",") if t.strip()]
+    exclude_climate_list = [c.strip() for c in (exclude_climate_bin or "").split(",") if c.strip()]
+    exclude_project_list = [p.strip() for p in (exclude_project_ids or "").split(",") if p.strip()]
+    
+    # Apply inclusion and exclusion filters
+    t_fuse = time.time()
+    fused_results, debug_info = fuse_and_sort(hydrated, D, w, f, strict=strict, 
+                                              query_spatial_features=None, store=st)
+    
+    # Apply exclusion filters
+    if exclude_typology_list or exclude_climate_list or exclude_project_list:
+        filtered_results = []
+        for result in fused_results:
+            # Check typology exclusion
+            if exclude_typology_list and result.get("typology") in exclude_typology_list:
+                continue
+            # Check climate exclusion
+            if exclude_climate_list and result.get("climate_bin") in exclude_climate_list:
+                continue
+            # Check project ID exclusion
+            if exclude_project_list and result.get("project_id") in exclude_project_list:
+                continue
+            filtered_results.append(result)
+        fused_results = filtered_results
+    
+    fusion_ms = int((time.time() - t_fuse) * 1000)
+    
+    # Pagination
+    total_count = len(fused_results)
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    paginated_results = fused_results[start_idx:end_idx]
+    has_more = end_idx < total_count
+    
+    # Assign ranks
+    for i, result in enumerate(paginated_results):
+        result["rank"] = start_idx + i + 1
+    
+    query_id = generate_query_id()
+    total_ms = int((time.time() - t_start) * 1000)
+    
+    return {
+        "query_id": query_id,
+        "latency_ms": total_ms,
+        "embed_latency_ms": embed_ms,
+        "search_latency_ms": search_ms,
+        "fusion_latency_ms": fusion_ms,
+        "weights": w.model_dump(),
+        "weights_effective": debug_info.get("weights_effective", {}),
+        "filters": f.model_dump(),
+        "results": paginated_results,
+        "page": page,
+        "page_size": page_size,
+        "has_more": has_more,
+        "total_count": total_count,
+        "debug": {
+            **debug_info,
+            "positive_images": len(positive_embeddings),
+            "negative_images": len(negative_embeddings),
+            "fusion_mode": fusion_mode,
+            "exclusions": {
+                "typology": exclude_typology_list,
+                "climate_bin": exclude_climate_list,
+                "project_ids": exclude_project_list,
+            }
+        }
+    }
+
+
 @app.post("/feedback")
 def feedback(body: Feedback):
     """Handle user feedback and update session weights"""
