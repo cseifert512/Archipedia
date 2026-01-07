@@ -77,7 +77,8 @@ def _cache_key(text: str, model: str) -> str:
 def embed_text(
     text: str,
     model: str = "text-embedding-3-small",
-    use_cache: bool = True
+    use_cache: bool = True,
+    max_retries: int = 3
 ) -> Optional[np.ndarray]:
     """
     Embed a single text string using OpenAI API.
@@ -86,6 +87,7 @@ def embed_text(
         text: The text to embed
         model: OpenAI embedding model to use
         use_cache: Whether to use in-memory cache
+        max_retries: Number of retries for rate limit errors
         
     Returns:
         numpy array of shape (1536,) or None if API call fails
@@ -103,32 +105,50 @@ def embed_text(
         if cache_key in _embedding_cache:
             return _embedding_cache[cache_key]
     
-    try:
-        response = requests.post(
-            "https://api.openai.com/v1/embeddings",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "input": text,
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        data = response.json()
-        embedding = np.array(data["data"][0]["embedding"], dtype="float32")
-        
-        # Cache the result
-        if use_cache:
-            _embedding_cache[cache_key] = embedding
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "input": text,
+                },
+                timeout=30,
+            )
             
-        return embedding
-        
-    except Exception as e:
-        logger.error(f"Failed to embed text: {e}")
-        return None
+            # Handle rate limiting with retry
+            if response.status_code == 429:
+                retry_after = int(response.headers.get("Retry-After", 2 ** attempt))
+                logger.warning(f"Rate limited, retrying in {retry_after}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(min(retry_after, 10))  # Cap at 10 seconds
+                continue
+                
+            response.raise_for_status()
+            data = response.json()
+            embedding = np.array(data["data"][0]["embedding"], dtype="float32")
+            
+            # Cache the result
+            if use_cache:
+                _embedding_cache[cache_key] = embedding
+                
+            return embedding
+            
+        except Exception as e:
+            last_error = e
+            if "429" in str(e) and attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                logger.warning(f"Rate limit error, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+            break
+    
+    logger.error(f"Failed to embed text after {max_retries} attempts: {last_error}")
+    return None
 
 
 def embed_texts_batch(
