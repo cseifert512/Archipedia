@@ -4,6 +4,7 @@ import argparse
 import glob
 import time
 import pathlib
+import hashlib
 import numpy as np
 from PIL import Image
 import torch
@@ -15,6 +16,31 @@ def l2n(x):
     """L2-normalize vectors along axis=1."""
     n = np.linalg.norm(x, axis=1, keepdims=True) + 1e-12
     return x / n
+
+
+def make_safe_image_id(project_id: str, image_name: str, max_len: int = 100) -> str:
+    """
+    Create a safe image_id that won't exceed Windows path limits.
+    
+    Windows has a 260 char path limit. With typical paths like:
+    C:/Users/.../data/embeddings/image/{image_id}.npy
+    We need to keep image_id under ~120 chars to be safe.
+    """
+    # If image name already contains project_id, just use that
+    if project_id in image_name:
+        base_id = f"i_{image_name}"
+    else:
+        base_id = f"i_{project_id}_{image_name}"
+    
+    # If short enough, use as-is
+    if len(base_id) <= max_len:
+        return base_id
+    
+    # Otherwise, create a shortened version with hash
+    # Keep first 60 chars + hash suffix for uniqueness
+    hash_suffix = hashlib.md5(base_id.encode()).hexdigest()[:12]
+    truncated = base_id[:max_len - 13]  # Leave room for underscore + hash
+    return f"{truncated}_{hash_suffix}"
 
 
 def load_model(name: str):
@@ -61,12 +87,34 @@ def main(data_dir: str, model_name: str):
               "Expected layout: data/images/<project_id>/*.jpg|*.jpeg|*.png", flush=True)
         return
 
+    # Check for existing embeddings to enable resume
+    existing_embeddings = set()
+    for existing_npy in glob.glob(os.path.join(emb_dir, "*.npy")):
+        existing_embeddings.add(pathlib.Path(existing_npy).stem)
+    
+    if existing_embeddings:
+        print(f"[embed] Found {len(existing_embeddings)} existing embeddings (will skip)", flush=True)
+    
     model, tfm = load_model(model_name)
 
+    skipped = 0
+    processed = 0
     for img_path in tqdm(image_paths, desc="[embed] Embedding", unit="img"):
         project_id = pathlib.Path(img_path).parent.name
         base = pathlib.Path(img_path).stem
-        image_id = f"i_{project_id}_{base}"
+        image_id = make_safe_image_id(project_id, base)
+        
+        # Skip if already processed
+        emb_path = os.path.join(emb_dir, f"{image_id}.npy")
+        if image_id in existing_embeddings or os.path.exists(emb_path):
+            # Still track metadata for id_map
+            image_meta[image_id] = {
+                "project_id": project_id,
+                "thumb": f"/images/{project_id}/{os.path.basename(img_path)}"
+            }
+            skipped += 1
+            continue
+        
         try:
             pil = Image.open(img_path).convert("RGB")
         except Exception as e:
@@ -79,11 +127,14 @@ def main(data_dir: str, model_name: str):
             vec = feat.cpu().numpy().astype("float32")
             vec = l2n(vec)[0]
 
-        np.save(os.path.join(emb_dir, f"{image_id}.npy"), vec)
+        np.save(emb_path, vec)
         image_meta[image_id] = {
             "project_id": project_id,
             "thumb": f"/images/{project_id}/{os.path.basename(img_path)}"
         }
+        processed += 1
+    
+    print(f"[embed] Processed {processed} new, skipped {skipped} existing", flush=True)
 
     # Build id_map in the SAME ORDER that build_faiss.py will load vectors
     # i.e., sorted by embedding file path under emb_dir
