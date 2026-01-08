@@ -14,7 +14,9 @@ class FaissStore:
         self.emb_dir = os.path.join(data_dir, "embeddings", "image")
         self.index_path = os.path.join(data_dir, "embeddings", "index.faiss")
         self.idmap_path = os.path.join(data_dir, "embeddings", "id_map.json")
-        self.meta_csv  = os.path.join(data_dir, "metadata", "projects.csv")
+        # Use enriched_projects.csv which matches the text index, fallback to projects.csv
+        enriched_csv = os.path.join(data_dir, "metadata", "enriched_projects.csv")
+        self.meta_csv = enriched_csv if os.path.exists(enriched_csv) else os.path.join(data_dir, "metadata", "projects.csv")
         self.spatial_csv = os.path.join(data_dir, "metadata", "spatial.csv")
         self._lock = threading.RLock()
         self._index = None
