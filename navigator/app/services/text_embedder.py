@@ -77,7 +77,8 @@ def _cache_key(text: str, model: str) -> str:
 def embed_text(
     text: str,
     model: str = "text-embedding-3-small",
-    use_cache: bool = True
+    use_cache: bool = True,
+    max_retries: int = 3
 ) -> Optional[np.ndarray]:
     """
     Embed a single text string using OpenAI API.
@@ -86,6 +87,7 @@ def embed_text(
         text: The text to embed
         model: OpenAI embedding model to use
         use_cache: Whether to use in-memory cache
+        max_retries: Number of retries for rate limiting (429 errors)
         
     Returns:
         numpy array of shape (1536,) or None if API call fails
@@ -103,32 +105,49 @@ def embed_text(
         if cache_key in _embedding_cache:
             return _embedding_cache[cache_key]
     
-    try:
-        response = requests.post(
-            "https://api.openai.com/v1/embeddings",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "input": text,
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        data = response.json()
-        embedding = np.array(data["data"][0]["embedding"], dtype="float32")
-        
-        # Cache the result
-        if use_cache:
-            _embedding_cache[cache_key] = embedding
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "input": text,
+                },
+                timeout=30,
+            )
             
-        return embedding
-        
-    except Exception as e:
-        logger.error(f"Failed to embed text: {e}")
-        return None
+            # Handle rate limiting with exponential backoff
+            if response.status_code == 429:
+                wait_time = (2 ** attempt) + 0.5  # 1.5s, 2.5s, 4.5s
+                logger.warning(f"Rate limited by OpenAI, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+                
+            response.raise_for_status()
+            data = response.json()
+            embedding = np.array(data["data"][0]["embedding"], dtype="float32")
+            
+            # Cache the result
+            if use_cache:
+                _embedding_cache[cache_key] = embedding
+                
+            return embedding
+            
+        except Exception as e:
+            if attempt < max_retries - 1 and "429" in str(e):
+                wait_time = (2 ** attempt) + 0.5
+                logger.warning(f"Rate limited, retrying in {wait_time}s")
+                time.sleep(wait_time)
+                continue
+            logger.error(f"Failed to embed text: {e}")
+            return None
+    
+    logger.error(f"Failed to embed text after {max_retries} retries")
+    return None
 
 
 def embed_texts_batch(
@@ -235,8 +254,9 @@ class TextEmbeddingIndex:
     
     def _keyword_search(self, query: str, top_k: int) -> List[Dict[str, Any]]:
         """
-        Fallback keyword search for short queries.
-        Searches by substring matching in titles, typologies, and searchable text.
+        Fallback keyword search for queries.
+        Searches by substring matching in titles, typologies, climate, and full text.
+        For multi-word queries, requires ALL words to be present (AND logic).
         
         Args:
             query: Search query (lowercased)
@@ -246,24 +266,62 @@ class TextEmbeddingIndex:
             List of matching results with scores
         """
         query_lower = query.lower().strip()
+        query_words = [w for w in query_lower.split() if len(w) >= 2]  # Split into words, ignore very short ones
         matches = []
         
         for i, meta in enumerate(self._metadata):
             title = str(meta.get("title", "")).lower()
             typology = str(meta.get("typology", "")).lower()
-            searchable = str(meta.get("searchable_text", "")).lower()
             country = str(meta.get("country", "")).lower()
+            climate = str(meta.get("climate_bin", "")).lower()
+            massing = str(meta.get("massing_type", "")).lower()
             
-            # Check for substring matches with different weights
-            score = 0.0
-            if query_lower in title:
-                score = 0.85  # Title match is strongest
-            elif query_lower in typology:
-                score = 0.75  # Typology match is strong
-            elif query_lower in country:
-                score = 0.65  # Country match
-            elif query_lower in searchable:
-                score = 0.55  # General text match
+            # Also get the full text from texts array if available
+            full_text = ""
+            if i < len(self._texts):
+                full_text = str(self._texts[i]).lower()
+            
+            # Combine all searchable fields
+            all_text = f"{title} {typology} {country} {climate} {massing} {full_text}"
+            
+            # For multi-word queries, check if ALL words are present
+            if len(query_words) > 1:
+                words_found = sum(1 for word in query_words if word in all_text)
+                if words_found == 0:
+                    continue
+                    
+                # Score based on how many words matched and where
+                base_score = words_found / len(query_words)  # 0.5 to 1.0
+                
+                # Boost if all words found
+                if words_found == len(query_words):
+                    # Check for matches in higher-value fields
+                    if all(word in title for word in query_words):
+                        score = 0.90
+                    elif all(word in typology for word in query_words):
+                        score = 0.80
+                    elif all(word in climate for word in query_words):
+                        score = 0.75  # Climate match
+                    elif any(word in typology for word in query_words) or any(word in climate for word in query_words):
+                        score = 0.70
+                    else:
+                        score = 0.60  # All words found in full text
+                else:
+                    # Partial match - some words found
+                    score = 0.40 * base_score
+            else:
+                # Single word query - use original logic
+                score = 0.0
+                if query_lower in title:
+                    score = 0.85  # Title match is strongest
+                elif query_lower in typology:
+                    score = 0.75  # Typology match is strong
+                elif query_lower in climate:
+                    score = 0.72  # Climate match
+                elif query_lower in country:
+                    score = 0.65  # Country match
+                elif query_lower in full_text:
+                    score = 0.55  # General text match
                 
             if score > 0:
                 result = {
