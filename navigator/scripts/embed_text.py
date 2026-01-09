@@ -40,6 +40,7 @@ METADATA_DIR = DATA_DIR / "metadata"
 EMBEDDINGS_DIR = DATA_DIR / "embeddings" / "text"
 
 CSV_PATH = METADATA_DIR / "projects.csv"
+UNIFIED_JSON = METADATA_DIR / "projects_unified.json"
 ENRICHED_JSON = METADATA_DIR / "projects_enriched.json"
 
 INDEX_PATH = EMBEDDINGS_DIR / "text_index.npz"
@@ -47,21 +48,39 @@ METADATA_PATH = EMBEDDINGS_DIR / "text_metadata.json"
 
 
 def load_projects() -> List[Dict[str, Any]]:
-    """Load projects from enriched JSON or CSV."""
+    """
+    Load projects from available sources.
+    Priority order:
+    1. projects_unified.json (full merged dataset)
+    2. projects.csv (primary CSV)
+    3. projects_enriched.json (legacy enriched, smaller set)
+    """
     projects = []
     
-    # Prefer enriched JSON if available
+    # Priority 1: Unified JSON (full merged dataset - 669+ projects)
+    if UNIFIED_JSON.exists():
+        print(f"Loading from {UNIFIED_JSON} (unified dataset)")
+        with open(UNIFIED_JSON, "r", encoding="utf-8") as f:
+            return json.load(f)
+    
+    # Priority 2: Main CSV (should also have full dataset)
+    if CSV_PATH.exists():
+        print(f"Loading from {CSV_PATH}")
+        return load_from_csv(CSV_PATH)
+    
+    # Priority 3: Enriched JSON (smaller set, ~158 projects)
     if ENRICHED_JSON.exists():
-        print(f"Loading from {ENRICHED_JSON}")
+        print(f"Loading from {ENRICHED_JSON} (enriched subset)")
         with open(ENRICHED_JSON, "r", encoding="utf-8") as f:
             return json.load(f)
     
-    # Fall back to CSV
-    if not CSV_PATH.exists():
-        raise FileNotFoundError(f"No project data found at {CSV_PATH} or {ENRICHED_JSON}")
-    
-    print(f"Loading from {CSV_PATH}")
-    df = pd.read_csv(CSV_PATH)
+    raise FileNotFoundError(f"No project data found in {METADATA_DIR}")
+
+
+def load_from_csv(csv_path: Path) -> List[Dict[str, Any]]:
+    """Load projects from a CSV file with proper field parsing."""
+    df = pd.read_csv(csv_path)
+    projects = []
     
     for _, row in df.iterrows():
         project = {
@@ -73,6 +92,11 @@ def load_projects() -> List[Dict[str, Any]]:
             "massing_type": str(row.get("massing_type", "")) if pd.notna(row.get("massing_type")) else None,
             "lat": float(row.get("lat", 0)) if pd.notna(row.get("lat")) else None,
             "lon": float(row.get("lon", 0)) if pd.notna(row.get("lon")) else None,
+            "architect": str(row.get("architect", "")) if pd.notna(row.get("architect")) else None,
+            "city": str(row.get("city", "")) if pd.notna(row.get("city")) else None,
+            "description": str(row.get("description", "")) if pd.notna(row.get("description")) else None,
+            "materials": str(row.get("materials", "")) if pd.notna(row.get("materials")) else None,
+            "year_completed": str(row.get("year_completed", "")) if pd.notna(row.get("year_completed")) else None,
         }
         
         # Parse image_ids if present
@@ -90,7 +114,14 @@ def load_projects() -> List[Dict[str, Any]]:
         tags_raw = row.get("tags", "")
         if pd.notna(tags_raw) and str(tags_raw).strip():
             try:
-                tags = json.loads(str(tags_raw).replace("'", '"'))
+                # Handle both JSON arrays and pipe-delimited strings
+                tags_str = str(tags_raw)
+                if tags_str.startswith("["):
+                    tags = json.loads(tags_str.replace("'", '"'))
+                elif "|" in tags_str:
+                    tags = [t.strip() for t in tags_str.split("|") if t.strip()]
+                else:
+                    tags = [t.strip() for t in tags_str.split(",") if t.strip()]
                 project["tags"] = tags
             except:
                 project["tags"] = []
@@ -105,8 +136,9 @@ def load_projects() -> List[Dict[str, Any]]:
 def build_searchable_text(project: Dict[str, Any]) -> str:
     """
     Build searchable text from project metadata.
-    Combines title, typology, country, tags, and narrative.
+    Combines title, architect, typology, country, tags, description, and narrative.
     """
+    import re
     parts = []
     
     # Title is most important - clean it up
@@ -115,11 +147,15 @@ def build_searchable_text(project: Dict[str, Any]) -> str:
         # Clean up auto-generated titles (remove IDs, underscores)
         clean_title = title.replace("_", " ")
         # Remove numeric suffixes like "1034548"
-        import re
         clean_title = re.sub(r'\s+\d{6,}\s*', ' ', clean_title)
         clean_title = re.sub(r'\s+P\s+[A-Za-z].*$', '', clean_title, flags=re.IGNORECASE)
         clean_title = ' '.join(clean_title.split())  # Normalize whitespace
         parts.append(clean_title)
+    
+    # Architect (important for search)
+    architect = project.get("architect")
+    if architect and architect.lower() not in ("unknown", "none", ""):
+        parts.append(f"Architect: {architect}")
     
     # Typology
     typology = project.get("typology") or project.get("project_type")
@@ -130,10 +166,19 @@ def build_searchable_text(project: Dict[str, Any]) -> str:
     country = project.get("country")
     if country and country.lower() not in ("unknown", "none", ""):
         parts.append(f"Location: {country}")
+    
+    city = project.get("city")
+    if city and city.lower() not in ("unknown", "none", ""):
+        parts.append(f"City: {city}")
         
     location = project.get("location")
     if location:
         parts.append(location)
+    
+    # Year completed
+    year = project.get("year_completed")
+    if year and str(year).lower() not in ("unknown", "none", "", "0"):
+        parts.append(f"Year: {year}")
     
     # Climate
     climate = project.get("climate_bin") or project.get("climate_zone")
@@ -145,25 +190,35 @@ def build_searchable_text(project: Dict[str, Any]) -> str:
     if massing and massing.lower() not in ("unknown", "none", ""):
         parts.append(f"Massing: {massing}")
     
-    # Tags
+    # Materials
+    materials = project.get("materials")
+    if materials and materials.lower() not in ("unknown", "none", ""):
+        parts.append(f"Materials: {materials}")
+    
+    # Tags (important for semantic search)
     tags = project.get("tags", [])
     if tags:
-        parts.append("Tags: " + ", ".join(tags[:10]))
+        if isinstance(tags, list):
+            parts.append("Tags: " + ", ".join(str(t) for t in tags[:15]))
+        elif isinstance(tags, str):
+            parts.append(f"Tags: {tags}")
     
     # Key features
     features = project.get("key_features", [])
     if features:
         parts.append("Features: " + ", ".join(features[:5]))
     
-    # Design narrative (from enrichment)
+    # Description (from ArchDaily - very valuable for search!)
+    description = project.get("description")
+    if description and len(str(description)) > 20:
+        # Truncate very long descriptions to ~500 chars
+        desc_text = str(description)[:500]
+        parts.append(f"Description: {desc_text}")
+    
+    # Design narrative (from AI enrichment)
     narrative = project.get("design_narrative")
     if narrative:
         parts.append(narrative)
-    
-    # Architect
-    architect = project.get("architect")
-    if architect:
-        parts.append(f"Architect: {architect}")
     
     return " | ".join(parts)
 
@@ -211,10 +266,13 @@ def main() -> int:
         # Store metadata for hydration
         meta = {
             "title": p.get("title"),
+            "architect": p.get("architect"),
             "country": p.get("country"),
+            "city": p.get("city"),
             "typology": p.get("typology") or p.get("project_type"),
             "climate_bin": p.get("climate_bin") or p.get("climate_zone"),
             "massing_type": p.get("massing_type"),
+            "year_completed": p.get("year_completed"),
             "lat": p.get("lat"),
             "lon": p.get("lon"),
         }
