@@ -127,11 +127,55 @@ def load_individual_jsons(metadata_dir: Path) -> List[Dict[str, Any]]:
     for json_file in json_files:
         try:
             with open(json_file, 'r', encoding='utf-8') as f:
-                project = json.load(f)
-                # Ensure project_id is set
-                if 'project_id' not in project:
-                    project['project_id'] = json_file.stem
-                projects.append(project)
+                raw = json.load(f)
+            
+            # Convert camelCase keys to snake_case and normalize schema
+            project = {}
+            
+            # project_id (handle both formats)
+            project['project_id'] = (
+                raw.get('project_id') or 
+                raw.get('projectId') or 
+                json_file.stem
+            )
+            
+            # title (handle both formats, extract from projectTitle if needed)
+            title = raw.get('title') or raw.get('projectTitle') or ''
+            if title:
+                # Clean up title: "Project Name / Architect" -> extract both
+                if ' / ' in title:
+                    parts = title.split(' / ')
+                    project['title'] = parts[0].strip()
+                    if len(parts) > 1 and not raw.get('architect'):
+                        project['architect'] = parts[1].strip()
+                else:
+                    project['title'] = title
+            
+            # URL
+            project['archdaily_url'] = raw.get('archdaily_url') or raw.get('projectUrl')
+            
+            # Image counts for reference
+            ext_count = raw.get('exteriorCount', 0)
+            int_count = raw.get('interiorCount', 0)
+            project['image_count'] = ext_count + int_count
+            
+            # File structure - build image_ids list
+            file_struct = raw.get('fileStructure', {})
+            image_ids = []
+            for img in file_struct.get('exteriors', []):
+                image_ids.append(f"i_{img.replace('.jpg', '').replace('.png', '')}")
+            for img in file_struct.get('interiors', []):
+                image_ids.append(f"i_{img.replace('.jpg', '').replace('.png', '')}")
+            if image_ids:
+                project['image_ids'] = image_ids
+            
+            # Copy over any other standard fields that exist
+            for key in ['country', 'city', 'typology', 'architect', 'description', 
+                        'tags', 'lat', 'lon', 'year_completed', 'materials']:
+                if key in raw and raw[key]:
+                    project[key] = raw[key]
+            
+            projects.append(project)
         except Exception as e:
             print(f"    Warning: Could not load {json_file.name}: {e}")
     
