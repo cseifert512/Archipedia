@@ -136,7 +136,7 @@ class EnrichedProject:
 
 
 # R2 CDN base URL
-R2_BASE = "https://pub-96a82c12e12a4f05b29760410a5e8f45.r2.dev"
+R2_BASE = "https://pub-12350662edb244568152a5b72ed1dbb8.r2.dev"
 
 
 def get_image_url(image_id: str) -> str:

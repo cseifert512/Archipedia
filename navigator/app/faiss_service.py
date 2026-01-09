@@ -6,7 +6,7 @@ import pandas as pd
 
 # Default R2 public URL for image hosting
 # Can be overridden via R2_PUBLIC_URL environment variable
-DEFAULT_R2_URL = "https://pub-96a82c12e12a4f05b29760410a5e8f45.r2.dev"
+DEFAULT_R2_URL = "https://pub-12350662edb244568152a5b72ed1dbb8.r2.dev"
 
 def get_r2_public_url() -> str:
     """Get the R2 public URL from environment or use default."""
