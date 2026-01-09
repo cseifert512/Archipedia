@@ -927,7 +927,8 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
         if not thumb_url:
             thumb_url = r.get("thumb_url")
         
-        # Get image URLs from id_map for carousel (use actual R2 URLs)
+        # Get image URLs from id_map for carousel (transform to R2 URLs)
+        from app.faiss_service import transform_to_r2_url
         image_urls = []
         base_pid = extract_base_project_id(project_id)
         if faiss_store._idmap:
@@ -936,11 +937,13 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
                     continue
                 meta_pid = meta.get("project_id", "")
                 if meta_pid.startswith(base_pid) or base_pid in meta_pid:
-                    thumb = meta.get("thumb")
-                    if thumb and thumb not in image_urls:
-                        image_urls.append(thumb)
-                        if len(image_urls) >= 8:
-                            break
+                    raw_thumb = meta.get("thumb")
+                    if raw_thumb:
+                        thumb = transform_to_r2_url(raw_thumb)
+                        if thumb not in image_urls:
+                            image_urls.append(thumb)
+                            if len(image_urls) >= 8:
+                                break
         
         raw_title = r.get("title", "")
         result = {

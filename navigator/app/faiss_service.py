@@ -4,6 +4,35 @@ import numpy as np
 import faiss
 import pandas as pd
 
+# Default R2 public URL for image hosting
+# Can be overridden via R2_PUBLIC_URL environment variable
+DEFAULT_R2_URL = "https://pub-96a82c12e12a4f05b29760410a5e8f45.r2.dev"
+
+def get_r2_public_url() -> str:
+    """Get the R2 public URL from environment or use default."""
+    return os.environ.get("R2_PUBLIC_URL", DEFAULT_R2_URL)
+
+def transform_to_r2_url(local_path: str) -> str:
+    """Transform a local image path to an R2 CDN URL.
+    
+    Converts paths like '/images/p_project_id/filename.jpg' 
+    to 'https://r2-url/p_project_id/filename.jpg'
+    """
+    if not local_path:
+        return ""
+    
+    # Already an absolute URL, return as-is
+    if local_path.startswith(("http://", "https://")):
+        return local_path
+    
+    # Strip leading slash and /images/ prefix
+    path = local_path.lstrip("/")
+    if path.startswith("images/"):
+        path = path[7:]  # Remove "images/" prefix
+    
+    r2_base = get_r2_public_url().rstrip("/")
+    return f"{r2_base}/{path}"
+
 def l2n(x: np.ndarray) -> np.ndarray:
     n = np.linalg.norm(x, axis=1, keepdims=True) + 1e-12
     return x / n
@@ -14,9 +43,10 @@ class FaissStore:
         self.emb_dir = os.path.join(data_dir, "embeddings", "image")
         self.index_path = os.path.join(data_dir, "embeddings", "index.faiss")
         self.idmap_path = os.path.join(data_dir, "embeddings", "id_map.json")
-        # Use enriched_projects.csv which matches the text index, fallback to projects.csv
-        enriched_csv = os.path.join(data_dir, "metadata", "enriched_projects.csv")
-        self.meta_csv = enriched_csv if os.path.exists(enriched_csv) else os.path.join(data_dir, "metadata", "projects.csv")
+        # Use projects_unified.csv (complete dataset), fallback to projects.csv
+        unified_csv = os.path.join(data_dir, "metadata", "projects_unified.csv")
+        projects_csv = os.path.join(data_dir, "metadata", "projects.csv")
+        self.meta_csv = unified_csv if os.path.exists(unified_csv) else projects_csv
         self.spatial_csv = os.path.join(data_dir, "metadata", "spatial.csv")
         self._lock = threading.RLock()
         self._index = None
@@ -134,14 +164,17 @@ class FaissStore:
             # Build a quick project_id -> thumb lookup for text search and hydration fallbacks
             # Also index by shortened project_id (without _exteriors_/_interiors_/_diagrams_ suffix)
             # so text search results can find thumbnails
+            # Transform local paths to R2 URLs when building the lookup
             self._thumb_by_project = {}
             try:
                 for _, meta in self._idmap.items():
                     if not isinstance(meta, dict):
                         continue
                     pid = meta.get("project_id")
-                    thumb = meta.get("thumb")
-                    if pid and thumb:
+                    raw_thumb = meta.get("thumb")
+                    if pid and raw_thumb:
+                        # Transform to R2 URL
+                        thumb = transform_to_r2_url(raw_thumb)
                         # Add full project_id
                         if pid not in self._thumb_by_project:
                             self._thumb_by_project[pid] = thumb
@@ -170,9 +203,12 @@ class FaissStore:
         for i in idxs:
             meta = idmap.get(str(i), {})
             pid = meta.get("project_id")
+            # Transform local thumb path to R2 URL
+            raw_thumb = meta.get("thumb")
+            thumb_url = transform_to_r2_url(raw_thumb) if raw_thumb else None
             row = {"image_id": meta.get("image_id"),
                    "project_id": pid,
-                   "thumb_url": meta.get("thumb")}
+                   "thumb_url": thumb_url}
             if prj is not None and not prj.empty and pid is not None:
                 hit = prj[prj["project_id"] == pid]
                 if not hit.empty:
@@ -204,11 +240,13 @@ class FaissStore:
 
     def results_payload(self, D: np.ndarray, I: np.ndarray) -> List[Dict[str, Any]]:
         """Hydrate FAISS hits into a list of result dicts, skipping entries that
-        don't have usable metadata or a thumbnail image on disk.
+        don't have usable metadata.
 
         This protects the frontend from rendering 'empty' project cards for
-        orphaned embeddings or missing images without mutating the underlying
-        index or metadata.
+        orphaned embeddings without mutating the underlying index or metadata.
+        
+        Note: thumb_url is now transformed to R2 CDN URLs during hydration,
+        so we don't check local file existence anymore.
         """
         out: List[Dict[str, Any]] = []
         hydrated = self._hydrate([int(i) for i in I.tolist()])
@@ -221,23 +259,10 @@ class FaissStore:
             if not pid or str(pid).strip() in {"null", "None"}:
                 continue
 
-            # Thumbnail handling:
-            # In production (Render), we may not ship the full image corpus. If we hard-drop results
-            # when thumbnails are missing, *every* query looks empty. Instead, return the hit and
-            # let the frontend render a placeholder when thumb_url is absent/unavailable.
-            # NOTE: If thumb_url is already an absolute URL (R2/CDN), skip the local file check.
-            thumb_missing = False
-            if thumb_url and not thumb_url.startswith(("http://", "https://")):
-                thumb_path = os.path.join(self.data_dir, thumb_url.lstrip("/"))
-                if not os.path.isfile(thumb_path):
-                    thumb_missing = True
-                    thumb_url = None
-
             out.append({
                 "rank": rank,
                 "distance": float(dist),
                 "faiss_id": int(idx),
-                "thumb_missing": thumb_missing,
                 **meta,
             })
 
