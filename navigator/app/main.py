@@ -927,6 +927,10 @@ def search_text(body: SearchByText, _: bool = Depends(require_token)):
         if not thumb_url:
             thumb_url = r.get("thumb_url")
         
+        # Skip projects without images - they would show "Image unavailable"
+        if not thumb_url:
+            continue
+        
         # Get image URLs from id_map for carousel (transform to R2 URLs)
         from app.faiss_service import transform_to_r2_url
         image_urls = []
@@ -1478,6 +1482,10 @@ async def search_hybrid(
             thumb = st.thumb_for_project(pid)
             if thumb:
                 result["thumb_url"] = thumb
+        
+        # Skip projects without images - they would show "Image unavailable"
+        if not result.get("thumb_url"):
+            continue
         
         result["combined_score"] = float(combined_score)
         result["visual_score"] = float(data["visual_score"])
