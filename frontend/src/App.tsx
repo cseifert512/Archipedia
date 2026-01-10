@@ -20,7 +20,6 @@ import { ContactPage } from "./pages/ContactPage";
 import { SignInPage } from "./pages/SignInPage";
 import { Toaster } from "./components/ui/sonner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { PasswordGate } from "./components/PasswordGate";
 
 export default function App() {
   return (
@@ -38,11 +37,7 @@ export default function App() {
         <Route path="/signin" component={SignInPage} />
         <Route path="/search" component={SearchLandingPage} />
         <Route path="/search/classic" component={ClassicSearchPage} />
-        <Route path="/canvas">
-          <PasswordGate>
-            <ResultsPage />
-          </PasswordGate>
-        </Route>
+        <Route path="/canvas" component={ResultsPage} />
         <Route path="/search/text" component={TextSearchPage} />
         <Route path="/search/image" component={ImageSearchPage} />
         <Route path="/results" component={ResultsPage} />
