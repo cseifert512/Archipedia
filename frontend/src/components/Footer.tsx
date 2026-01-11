@@ -9,38 +9,39 @@ export function Footer() {
       className="fixed bottom-0 left-0 right-0 flex justify-center"
       style={{
         padding: "0",
-        paddingBottom: "16px",
+        paddingBottom: "4px",
         zIndex: 50,
       }}
     >
       <div 
         style={{
-          width: "75%",
-          maxWidth: "75%",
+          width: "35%",
+          maxWidth: "360px",
+          minWidth: "240px",
           overflow: "hidden",
         }}
       >
         <LensFrame 
-          className="px-14 rounded-t-lg"
+          className="px-2 rounded-t-lg"
           style={{
-            paddingTop: "12px",
-            paddingBottom: "12px",
+            paddingTop: "2px",
+            paddingBottom: "2px",
           }}
         >
-          <div className="flex justify-between items-end">
+          <div className="flex justify-between items-center">
             <button 
               onClick={() => setLocation("/")}
               className="text-left hover:opacity-70 transition-opacity"
               style={{ 
                 fontFamily: "var(--font-primary)", 
                 color: "#000000",
-                paddingLeft: "24px",
+                paddingLeft: "4px",
               }}
             >
-              <div style={{ fontSize: "26px", fontWeight: 400 }}>
+              <div style={{ fontSize: "8px", fontWeight: 400 }}>
                 ARCHIPEDIA
               </div>
-              <div style={{ fontSize: "19px", fontWeight: 300 }}>
+              <div style={{ fontSize: "6px", fontWeight: 300 }}>
                 PEAR.DESIGN
               </div>
             </button>
@@ -50,10 +51,10 @@ export function Footer() {
               className="relative hover-underline"
               style={{ 
                 fontFamily: "var(--font-primary)",
-                fontSize: "18px",
+                fontSize: "6px",
                 fontWeight: 300,
                 color: "#000000",
-                paddingRight: "24px",
+                paddingRight: "4px",
               }}
             >
               Curious?

@@ -55,7 +55,7 @@ export function Header({
       <header
         className="fixed top-0 left-0 right-0"
         style={{
-          padding: "16px",
+          padding: "8px",
           zIndex: 50,
           display: "flex",
           justifyContent: "flex-start",
@@ -67,11 +67,11 @@ export function Header({
           className="hover:opacity-80 transition-opacity"
           style={{
             fontFamily: "var(--font-primary)",
-            fontSize: "12px",
+            fontSize: "9px",
             background: "rgba(255,255,255,0.8)",
             border: "1px solid rgba(0,0,0,0.12)",
-            borderRadius: "8px",
-            padding: "8px 10px",
+            borderRadius: "4px",
+            padding: "4px 6px",
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
           }}
@@ -138,7 +138,7 @@ export function Header({
       className="fixed top-0 left-0 right-0 flex justify-center"
       style={{
         padding: "0",
-        paddingTop: "16px",
+        paddingTop: "4px",
         zIndex: 50,
       }}
     >
@@ -152,22 +152,23 @@ export function Header({
 
       <div 
         style={{
-          width: "75%",
-          maxWidth: "75%",
+          width: "35%",
+          maxWidth: "360px",
+          minWidth: "240px",
           overflow: "hidden",
       }}
     >
         <LensFrame 
-          className="px-14 rounded-b-lg"
+          className="px-2 rounded-b-lg"
           style={{
-            paddingTop: "12px",
-            paddingBottom: "12px",
+            paddingTop: "2px",
+            paddingBottom: "2px",
           }}
         >
           {uploadedImage && (
-            <div className="mb-4 flex justify-center">
+            <div className="mb-0.5 flex justify-center">
               <div className="relative inline-block">
-                <div className="relative w-32 h-32 rounded-lg overflow-hidden border-2 border-[rgba(0,0,0,0.3)]">
+                <div className="relative w-7 h-7 rounded overflow-hidden border border-[rgba(0,0,0,0.3)]">
                   <img
                     src={uploadedImage}
                     alt="Uploaded reference"
@@ -175,25 +176,25 @@ export function Header({
                   />
                   <button
                     onClick={removeUploadedImage}
-                    className="absolute top-1 right-1 p-1 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+                    className="absolute top-0 right-0 p-0.5 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
                     type="button"
                   >
-                    <X size={14} className="text-[#000000]" />
+                    <X size={6} className="text-[#000000]" />
                   </button>
                 </div>
                 <div 
-                  className="absolute -top-2 -left-2 px-2 py-0.5 bg-[rgba(0,0,0,0.8)] text-white rounded"
-                  style={{ fontSize: "10px" }}
+                  className="absolute -top-1 -left-1 px-0.5 py-0 bg-[rgba(0,0,0,0.8)] text-white rounded"
+                  style={{ fontSize: "5px" }}
                 >
-                  Reference
+                  Ref
                 </div>
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSearch} className="flex items-center gap-8">
+          <form onSubmit={handleSearch} className="flex items-center gap-2">
             <div className="flex-1 relative">
-              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 flex items-center gap-3" style={{ marginLeft: "12px" }}>
+              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 flex items-center gap-1" style={{ marginLeft: "4px" }}>
                 {showRefresh && onRefresh && (
                   <button
                     type="button"
@@ -204,7 +205,7 @@ export function Header({
                     }}
                     title="Refresh nodes"
                   >
-                    <RotateCw size={20} strokeWidth={1.5} color="#000000" />
+                    <RotateCw size={9} strokeWidth={1.5} color="#000000" />
                   </button>
                 )}
 
@@ -218,7 +219,7 @@ export function Header({
                   }}
                   title="Upload reference image"
                 >
-                  <Camera size={20} strokeWidth={1.5} color="#000000" />
+                  <Camera size={9} strokeWidth={1.5} color="#000000" />
                 </button>
         </div>
 
@@ -226,19 +227,19 @@ export function Header({
             type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border-0 border-b border-[rgba(0,0,0,0.3)] pb-3 focus:outline-none transition-colors"
+                className="w-full bg-transparent border-0 border-b border-[rgba(0,0,0,0.3)] pb-0.5 focus:outline-none transition-colors"
             style={{
                   fontFamily: "var(--font-primary)",
-                  fontSize: "25px",
+                  fontSize: "9px",
                   color: searchQuery ? "#000000" : "transparent",
-                  padding: `12px 18px 12px ${showRefresh ? '80px' : '50px'}`,
+                  padding: `3px 6px 3px ${showRefresh ? '32px' : '22px'}`,
                 }}
               />
               
               {!searchQuery && (
                 <>
                   <div 
-                    className="absolute inset-0 flex items-end pb-3 pointer-events-none"
+                    className="absolute inset-0 flex items-end pb-0.5 pointer-events-none"
                     style={{
                       opacity: isPlaceholderVisible ? 1 : 0,
                       transition: "opacity 500ms ease-in-out"
@@ -247,9 +248,9 @@ export function Header({
                     <span 
                       style={{
                         fontFamily: "var(--font-primary)",
-                        fontSize: "25px",
+                        fontSize: "9px",
                         color: "#000000",
-                        padding: `12px 18px 12px ${showRefresh ? '80px' : '50px'}`
+                        padding: `3px 6px 3px ${showRefresh ? '32px' : '22px'}`
                       }}
                     >
                       {searchPlaceholders[placeholderIndex]}
@@ -257,9 +258,9 @@ export function Header({
                   </div>
                   
                   <div
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none"
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 pointer-events-none"
                     style={{
-                      fontSize: "13px",
+                      fontSize: "6px",
                       color: "rgba(0,0,0,0.4)",
                       fontFamily: "var(--font-primary)",
                       fontWeight: 300,
@@ -273,18 +274,18 @@ export function Header({
 
           <button
             type="submit"
-              className="rounded-md transition-all"
+              className="rounded transition-all"
             style={{
                 fontFamily: "var(--font-primary)",
-                fontSize: "21px",
+                fontSize: "7px",
                 backgroundColor: (searchQuery || uploadedImage) ? "var(--accent)" : "transparent",
                 color: "#000000",
                 border: (searchQuery || uploadedImage) ? "none" : "1px solid rgba(0,0,0,0.3)",
                 backdropFilter: !(searchQuery || uploadedImage) ? "blur(4px)" : "none",
-                paddingLeft: "32px",
-                paddingRight: "40px",
-                paddingTop: "16px",
-                paddingBottom: "16px",
+                paddingLeft: "8px",
+                paddingRight: "10px",
+                paddingTop: "4px",
+                paddingBottom: "4px",
             }}
           >
             Search
