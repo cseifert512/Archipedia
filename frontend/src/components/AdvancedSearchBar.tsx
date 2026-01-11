@@ -266,25 +266,27 @@ export function AdvancedSearchBar({
                         </span>
                       </div>
                       
-                      <div
-                        className={`absolute ${variant === "header" ? "right-1" : variant === "inline" ? "right-2" : "right-4"} top-1/2 transform -translate-y-1/2 pointer-events-none`}
-                        style={{
-                          fontSize: variant === "header" ? "6px" : variant === "inline" ? "10px" : "13px",
-                          color: "rgba(0,0,0,0.4)",
-                          fontFamily: "var(--font-primary)",
-                          fontWeight: 300,
-                        }}
-                      >
-                        text + image
-                      </div>
+                      {variant !== "header" && variant !== "inline" && (
+                        <div
+                          className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none"
+                          style={{
+                            fontSize: "13px",
+                            color: "rgba(0,0,0,0.4)",
+                            fontFamily: "var(--font-primary)",
+                            fontWeight: 300,
+                          }}
+                        >
+                          text + image
+                        </div>
+                      )}
                     </>
                   )}
                   
-                  {animatedPlaceholders.length === 0 && (
+                  {animatedPlaceholders.length === 0 && variant !== "header" && variant !== "inline" && (
                     <div
-                      className={`absolute ${variant === "header" ? "right-1" : variant === "inline" ? "right-2" : "right-4"} top-1/2 transform -translate-y-1/2 pointer-events-none`}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none"
                       style={{
-                        fontSize: variant === "header" ? "6px" : variant === "inline" ? "10px" : "13px",
+                        fontSize: "13px",
                         color: "rgba(0,0,0,0.4)",
                         fontFamily: "var(--font-primary)",
                         fontWeight: 300,
