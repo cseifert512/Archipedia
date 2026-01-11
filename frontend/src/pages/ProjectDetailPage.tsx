@@ -170,26 +170,28 @@ export function ProjectDetailPage() {
         className="fixed top-0 left-0 right-0 flex justify-center"
         style={{
           padding: "0",
-          paddingTop: "16px",
+          paddingTop: "4px",
           zIndex: 50,
         }}
       >
         <div 
           style={{
-            width: "75%",
-            maxWidth: "75%",
+            width: "35%",
+            maxWidth: "360px",
+            minWidth: "240px",
             overflow: "hidden",
           }}
         >
           <AdvancedSearchBar
             onSearch={handleSearch}
             showImageUpload={true}
+            variant="header"
           />
         </div>
       </header>
 
       {/* Main Content - All within same margins */}
-      <main className="flex-1" style={{ paddingTop: "120px" }}>
+      <main className="flex-1" style={{ paddingTop: "50px" }}>
         <div 
           style={{
             width: "75%",

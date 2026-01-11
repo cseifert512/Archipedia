@@ -99,16 +99,16 @@ export function AdvancedSearchBar({
       />
       
       <LensFrame 
-        className={`px-14 ${variant === "hero" ? "rounded-lg" : "rounded-b-lg"} ${className}`}
+        className={`${variant === "header" ? "px-2" : "px-14"} ${variant === "hero" ? "rounded-lg" : "rounded-b-lg"} ${className}`}
       >
         <div style={{
-          paddingTop: "5px",
-          paddingBottom: "5px",
+          paddingTop: variant === "header" ? "2px" : "5px",
+          paddingBottom: variant === "header" ? "2px" : "5px",
         }}>
         {uploadedImage && (
-          <div className="mb-4 flex justify-center">
+          <div className={variant === "header" ? "mb-0.5 flex justify-center" : "mb-4 flex justify-center"}>
             <div className="relative inline-block">
-              <div className="relative w-32 h-32 rounded-lg overflow-hidden border-2 border-[rgba(0,0,0,0.3)]">
+              <div className={`relative ${variant === "header" ? "w-7 h-7" : "w-32 h-32"} rounded-lg overflow-hidden border-2 border-[rgba(0,0,0,0.3)]`}>
                 <img
                   src={uploadedImage}
                   alt="Uploaded reference"
@@ -116,25 +116,25 @@ export function AdvancedSearchBar({
                 />
                 <button
                   onClick={removeUploadedImage}
-                  className="absolute top-1 right-1 p-1 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+                  className="absolute top-0 right-0 p-0.5 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
                   type="button"
                 >
-                  <X size={14} className="text-[#000000]" />
+                  <X size={variant === "header" ? 6 : 14} className="text-[#000000]" />
                 </button>
               </div>
               <div 
-                className="absolute -top-2 -left-2 px-2 py-0.5 bg-[rgba(0,0,0,0.8)] text-white rounded"
-                style={{ fontSize: "10px" }}
+                className="absolute -top-1 -left-1 px-0.5 py-0 bg-[rgba(0,0,0,0.8)] text-white rounded"
+                style={{ fontSize: variant === "header" ? "5px" : "10px" }}
               >
-                Reference
+                {variant === "header" ? "Ref" : "Reference"}
               </div>
             </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex items-center gap-8">
+        <form onSubmit={handleSubmit} className={`flex items-center ${variant === "header" ? "gap-2" : "gap-8"}`}>
           <div className="flex-1 relative">
-            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 flex items-center gap-3" style={{ marginLeft: "12px" }}>
+            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 flex items-center gap-1" style={{ marginLeft: variant === "header" ? "4px" : "12px" }}>
               {showImageUpload && (
                 <>
                   {showRefreshButton && refreshButtonPosition === "before" && (
@@ -149,6 +149,8 @@ export function AdvancedSearchBar({
                     >
                       {variant === "hero" ? (
                         <RotateCw size={20} strokeWidth={1.5} color="#000000" />
+                      ) : variant === "header" ? (
+                        <RefreshCw size={9} strokeWidth={1.5} color="#000000" />
                       ) : (
                         <RefreshCw size={20} strokeWidth={1.5} color="#000000" />
                       )}
@@ -164,7 +166,7 @@ export function AdvancedSearchBar({
                     }}
                     title="Upload reference image"
                   >
-                    <Camera size={20} strokeWidth={1.5} color="#000000" />
+                    <Camera size={variant === "header" ? 9 : 20} strokeWidth={1.5} color="#000000" />
                   </button>
 
                   {showRefreshButton && refreshButtonPosition === "after" && (
@@ -179,6 +181,8 @@ export function AdvancedSearchBar({
                     >
                       {variant === "hero" ? (
                         <RotateCw size={20} strokeWidth={1.5} color="#000000" />
+                      ) : variant === "header" ? (
+                        <RefreshCw size={9} strokeWidth={1.5} color="#000000" />
                       ) : (
                         <RefreshCw size={20} strokeWidth={1.5} color="#000000" />
                       )}
@@ -197,15 +201,20 @@ export function AdvancedSearchBar({
                   }}
                   title="Refresh"
                 >
-                  <RefreshCw size={20} strokeWidth={1.5} color="#000000" />
+                  <RefreshCw size={variant === "header" ? 9 : 20} strokeWidth={1.5} color="#000000" />
                 </button>
               )}
             </div>
 
             {(() => {
               const buttonCount = (showImageUpload ? 1 : 0) + (showRefreshButton ? 1 : 0);
-              // ResultsPage uses 74px when both buttons are present
-              const leftPadding = buttonCount === 0 ? "42px" : buttonCount === 1 ? "42px" : (refreshButtonPosition === "before" ? "74px" : "80px");
+              // Compact padding for header variant
+              const leftPadding = variant === "header" 
+                ? (buttonCount === 0 ? "22px" : buttonCount === 1 ? "22px" : "32px")
+                : (buttonCount === 0 ? "42px" : buttonCount === 1 ? "42px" : (refreshButtonPosition === "before" ? "74px" : "80px"));
+              
+              const fontSize = variant === "header" ? "9px" : "25px";
+              const inputPadding = variant === "header" ? `3px 6px 3px ${leftPadding}` : `12px 18px 12px ${leftPadding}`;
               
               return (
                 <>
@@ -213,12 +222,12 @@ export function AdvancedSearchBar({
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="w-full bg-transparent border-0 border-b border-[rgba(0,0,0,0.3)] pb-3 focus:outline-none transition-colors"
+                    className={`w-full bg-transparent border-0 border-b border-[rgba(0,0,0,0.3)] ${variant === "header" ? "pb-0.5" : "pb-3"} focus:outline-none transition-colors`}
                     style={{
                       fontFamily: "var(--font-primary)",
-                      fontSize: "25px",
+                      fontSize,
                       color: animatedPlaceholders.length > 0 && !query ? "transparent" : "#000000",
-                      padding: `12px 18px 12px ${leftPadding}`,
+                      padding: inputPadding,
                     }}
                     placeholder={animatedPlaceholders.length === 0 ? placeholder : ""}
                     disabled={disabled}
@@ -227,7 +236,7 @@ export function AdvancedSearchBar({
                   {animatedPlaceholders.length > 0 && !query && (
                     <>
                       <div 
-                        className="absolute inset-0 flex items-end pb-3 pointer-events-none"
+                        className={`absolute inset-0 flex items-end ${variant === "header" ? "pb-0.5" : "pb-3"} pointer-events-none`}
                         style={{
                           opacity: isPlaceholderVisible ? 1 : 0,
                           transition: "opacity 500ms ease-in-out"
@@ -236,9 +245,9 @@ export function AdvancedSearchBar({
                         <span 
                           style={{
                             fontFamily: "var(--font-primary)",
-                            fontSize: "25px",
+                            fontSize,
                             color: "#000000",
-                            padding: `12px 18px 12px ${leftPadding}`
+                            padding: inputPadding
                           }}
                         >
                           {animatedPlaceholders[placeholderIndex]}
@@ -246,9 +255,9 @@ export function AdvancedSearchBar({
                       </div>
                       
                       <div
-                        className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none"
+                        className={`absolute ${variant === "header" ? "right-1" : "right-4"} top-1/2 transform -translate-y-1/2 pointer-events-none`}
                         style={{
-                          fontSize: "13px",
+                          fontSize: variant === "header" ? "6px" : "13px",
                           color: "rgba(0,0,0,0.4)",
                           fontFamily: "var(--font-primary)",
                           fontWeight: 300,
@@ -261,9 +270,9 @@ export function AdvancedSearchBar({
                   
                   {animatedPlaceholders.length === 0 && (
                     <div
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none"
+                      className={`absolute ${variant === "header" ? "right-1" : "right-4"} top-1/2 transform -translate-y-1/2 pointer-events-none`}
                       style={{
-                        fontSize: "13px",
+                        fontSize: variant === "header" ? "6px" : "13px",
                         color: "rgba(0,0,0,0.4)",
                         fontFamily: "var(--font-primary)",
                         fontWeight: 300,
@@ -282,7 +291,7 @@ export function AdvancedSearchBar({
             className="rounded-md transition-all"
             style={{
               fontFamily: "var(--font-primary)",
-              fontSize: "21px",
+              fontSize: variant === "header" ? "7px" : "21px",
               backgroundColor: buttonStyle === "transparent-when-empty" && !query && !uploadedImage
                 ? "transparent"
                 : hasConnections
@@ -295,10 +304,10 @@ export function AdvancedSearchBar({
               backdropFilter: buttonStyle === "transparent-when-empty" && !query && !uploadedImage
                 ? "blur(4px)"
                 : "none",
-              paddingLeft: "32px",
-              paddingRight: "32px",
-              paddingTop: "16px",
-              paddingBottom: "16px",
+              paddingLeft: variant === "header" ? "8px" : "32px",
+              paddingRight: variant === "header" ? "10px" : "32px",
+              paddingTop: variant === "header" ? "4px" : "16px",
+              paddingBottom: variant === "header" ? "4px" : "16px",
             }}
             disabled={disabled}
           >

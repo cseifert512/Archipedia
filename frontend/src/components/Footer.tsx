@@ -1,7 +1,12 @@
 import { useLocation } from "wouter";
 import { LensFrame } from "./LensFrame";
 
-export function Footer() {
+interface FooterProps {
+  variant?: "default" | "minimal";
+  logoLink?: string;
+}
+
+export function Footer({ variant = "default", logoLink = "/" }: FooterProps) {
   const [, setLocation] = useLocation();
 
   return (
@@ -15,9 +20,9 @@ export function Footer() {
     >
       <div 
         style={{
-          width: "35%",
-          maxWidth: "360px",
-          minWidth: "240px",
+          width: variant === "minimal" ? "25%" : "35%",
+          maxWidth: variant === "minimal" ? "280px" : "360px",
+          minWidth: variant === "minimal" ? "180px" : "240px",
           overflow: "hidden",
         }}
       >
@@ -30,7 +35,7 @@ export function Footer() {
         >
           <div className="flex justify-between items-center">
             <button 
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation(logoLink)}
               className="text-left hover:opacity-70 transition-opacity"
               style={{ 
                 fontFamily: "var(--font-primary)", 
@@ -38,10 +43,10 @@ export function Footer() {
                 paddingLeft: "4px",
               }}
             >
-              <div style={{ fontSize: "8px", fontWeight: 400 }}>
+              <div style={{ fontSize: variant === "minimal" ? "7px" : "8px", fontWeight: 400 }}>
                 ARCHIPEDIA
               </div>
-              <div style={{ fontSize: "6px", fontWeight: 300 }}>
+              <div style={{ fontSize: variant === "minimal" ? "5px" : "6px", fontWeight: 300 }}>
                 PEAR.DESIGN
               </div>
             </button>
@@ -51,7 +56,7 @@ export function Footer() {
               className="relative hover-underline"
               style={{ 
                 fontFamily: "var(--font-primary)",
-                fontSize: "6px",
+                fontSize: variant === "minimal" ? "5px" : "6px",
                 fontWeight: 300,
                 color: "#000000",
                 paddingRight: "4px",
