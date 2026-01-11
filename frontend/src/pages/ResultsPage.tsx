@@ -65,57 +65,58 @@ export function ResultsPage() {
   const selectedNodeResults = useMemo(() => {
     if (!selectedNode) return null;
     const data = selectedNode.data as any;
+    
+    // Helper to transform project/result objects to SearchResult format
+    const transformProject = (p: any): SearchResult => ({
+      id: p.id || p.project_id || '',
+      name: p.title || p.name || 'Project',
+      imageUrl: p.thumbnail || p.thumb_url || '',
+      url: p.thumbnail || p.thumb_url || '',
+      buildingType: p.attributes?.typology || p.typology || '',
+      climate: p.attributes?.climate ? [p.attributes.climate] : [],
+      matchPercentage: 90,
+      similarityScore: 0.9,
+      visualScore: 0.9,
+      spatialScore: 0.9,
+      attributeScore: 0.9,
+      typology: p.attributes?.typology || p.typology || '',
+    });
+    
+    const transformResult = (r: any, idx: number): SearchResult => ({
+      id: String(r.project_id || r.id || `result_${idx}`),
+      name: String(r.title || r.project_id || 'Result'),
+      imageUrl: r.thumb_url ? toAbsoluteUrl(r.thumb_url) : undefined,
+      url: r.thumb_url ? toAbsoluteUrl(r.thumb_url) : undefined,
+      buildingType: r.typology || '',
+      climate: r.climate_bin ? [r.climate_bin] : [],
+      matchPercentage: Math.max(10, 100 - idx),
+      similarityScore: r.score ?? (1 - (r.distance ?? 0.5)),
+      visualScore: 0.8,
+      spatialScore: 0.8,
+      attributeScore: 0.8,
+      typology: r.typology || '',
+    });
+    
     // Check for projects array (from Precedent nodes or execution results)
     if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
-      return data.projects.map((p: any): SearchResult => ({
-        id: p.id || p.project_id || '',
-        name: p.title || p.name || 'Project',
-        imageUrl: p.thumbnail || p.thumb_url || '',
-        url: p.thumbnail || p.thumb_url || '',
-        buildingType: p.attributes?.typology || p.typology || '',
-        climate: p.attributes?.climate ? [p.attributes.climate] : [],
-        matchPercentage: 90,
-        similarityScore: 0.9,
-        visualScore: 0.9,
-        spatialScore: 0.9,
-        attributeScore: 0.9,
-        typology: p.attributes?.typology || p.typology || '',
-      }));
+      return data.projects.map(transformProject);
     }
+    
+    // Check for executionResult with projects array (from ResultsNode or TextNode)
+    if (data.executionResult?.projects && Array.isArray(data.executionResult.projects) && data.executionResult.projects.length > 0) {
+      return data.executionResult.projects.map(transformProject);
+    }
+    
     // Check for executionResult with results array
-    if (data.executionResult?.results && Array.isArray(data.executionResult.results)) {
-      return data.executionResult.results.map((r: any, idx: number): SearchResult => ({
-        id: String(r.project_id || `result_${idx}`),
-        name: String(r.title || r.project_id || 'Result'),
-        imageUrl: r.thumb_url ? toAbsoluteUrl(r.thumb_url) : undefined,
-        url: r.thumb_url ? toAbsoluteUrl(r.thumb_url) : undefined,
-        buildingType: r.typology || '',
-        climate: r.climate_bin ? [r.climate_bin] : [],
-        matchPercentage: Math.max(10, 100 - idx),
-        similarityScore: r.score ?? (1 - (r.distance ?? 0.5)),
-        visualScore: 0.8,
-        spatialScore: 0.8,
-        attributeScore: 0.8,
-        typology: r.typology || '',
-      }));
+    if (data.executionResult?.results && Array.isArray(data.executionResult.results) && data.executionResult.results.length > 0) {
+      return data.executionResult.results.map(transformResult);
     }
-    // Check for executionResult with projects array
-    if (data.executionResult?.projects && Array.isArray(data.executionResult.projects)) {
-      return data.executionResult.projects.map((p: any): SearchResult => ({
-        id: p.id || p.project_id || '',
-        name: p.title || p.name || 'Project',
-        imageUrl: p.thumbnail || p.thumb_url || '',
-        url: p.thumbnail || p.thumb_url || '',
-        buildingType: p.attributes?.typology || p.typology || '',
-        climate: p.attributes?.climate ? [p.attributes.climate] : [],
-        matchPercentage: 90,
-        similarityScore: 0.9,
-        visualScore: 0.9,
-        spatialScore: 0.9,
-        attributeScore: 0.9,
-        typology: p.attributes?.typology || p.typology || '',
-      }));
+    
+    // Check for executionResult.output array (from ResultsNode)
+    if (data.executionResult?.output && Array.isArray(data.executionResult.output) && data.executionResult.output.length > 0) {
+      return data.executionResult.output.map(transformProject);
     }
+    
     return null;
   }, [selectedNode]);
 
@@ -1022,8 +1023,8 @@ export function ResultsPage() {
           </div>
         </div>
 
-        {/* Section 3: Results Grid - Show when user has searched OR when a node with results is selected */}
-        {(hasSearched || selectedNodeResults) && (
+        {/* Section 3: Results Grid - Show when user has searched, when a node with results is selected, or when any search has been performed */}
+        {(hasSearched || selectedNodeResults || searchResults.length > 0) && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, height: '50%', flexShrink: 0 }}>
             <div
               style={{
