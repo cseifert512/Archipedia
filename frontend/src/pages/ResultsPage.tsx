@@ -184,6 +184,9 @@ export function ResultsPage() {
 
   // Track if we've already handled the image param
   const imageParamHandledRef = useRef(false);
+  
+  // Track if we've already handled the query param for canvas node creation
+  const queryParamHandledRef = useRef(false);
 
   // Create an image node if imageParam is present in URL
   useEffect(() => {
@@ -196,6 +199,30 @@ export function ResultsPage() {
       addNodes([imageNode]);
     }
   }, [imageParam, addNodes]);
+  
+  // Create a text node with query and auto-execute when coming from Advanced Canvas search
+  useEffect(() => {
+    const query = initialSearchQuery.trim();
+    if (!query) return;
+    if (queryParamHandledRef.current) return;
+    if (nodes.length > 0) return; // Don't add if there are already nodes on canvas
+    
+    queryParamHandledRef.current = true;
+    
+    // Create a text node with the search query at a central position
+    const textNode = createTextNode(
+      { x: 200, y: 150 },
+      query
+    );
+    
+    addNodes([textNode]);
+    
+    // Execute the text node after a brief delay to ensure it's added to the store
+    setTimeout(() => {
+      const { executeFromNode } = useCanvasStore.getState();
+      executeFromNode(textNode.id);
+    }, 100);
+  }, [initialSearchQuery, nodes.length, addNodes]);
 
   // Filter results
   const filteredResults = useMemo(() => {
