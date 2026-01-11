@@ -14,23 +14,22 @@ export function Footer({ variant = "default", logoLink = "/" }: FooterProps) {
       className="fixed bottom-0 left-0 right-0 flex justify-center"
       style={{
         padding: "0",
-        paddingBottom: "4px",
         zIndex: 50,
       }}
     >
       <div 
         style={{
-          width: variant === "minimal" ? "25%" : "35%",
-          maxWidth: variant === "minimal" ? "280px" : "360px",
-          minWidth: variant === "minimal" ? "180px" : "240px",
+          width: variant === "minimal" ? "40%" : "35%",
+          maxWidth: variant === "minimal" ? "480px" : "360px",
+          minWidth: variant === "minimal" ? "280px" : "240px",
           overflow: "hidden",
         }}
       >
         <LensFrame 
-          className="px-2 rounded-t-lg"
+          className={variant === "minimal" ? "px-4 rounded-t-lg" : "px-2 rounded-t-lg"}
           style={{
-            paddingTop: "2px",
-            paddingBottom: "2px",
+            paddingTop: variant === "minimal" ? "6px" : "2px",
+            paddingBottom: variant === "minimal" ? "6px" : "2px",
           }}
         >
           <div className="flex justify-between items-center">
@@ -40,13 +39,13 @@ export function Footer({ variant = "default", logoLink = "/" }: FooterProps) {
               style={{ 
                 fontFamily: "var(--font-primary)", 
                 color: "#000000",
-                paddingLeft: "4px",
+                paddingLeft: variant === "minimal" ? "8px" : "4px",
               }}
             >
-              <div style={{ fontSize: variant === "minimal" ? "7px" : "8px", fontWeight: 400 }}>
+              <div style={{ fontSize: variant === "minimal" ? "14px" : "8px", fontWeight: 400 }}>
                 ARCHIPEDIA
               </div>
-              <div style={{ fontSize: variant === "minimal" ? "5px" : "6px", fontWeight: 300 }}>
+              <div style={{ fontSize: variant === "minimal" ? "10px" : "6px", fontWeight: 300 }}>
                 PEAR.DESIGN
               </div>
             </button>
@@ -56,10 +55,10 @@ export function Footer({ variant = "default", logoLink = "/" }: FooterProps) {
               className="relative hover-underline"
               style={{ 
                 fontFamily: "var(--font-primary)",
-                fontSize: variant === "minimal" ? "5px" : "6px",
+                fontSize: variant === "minimal" ? "10px" : "6px",
                 fontWeight: 300,
                 color: "#000000",
-                paddingRight: "4px",
+                paddingRight: variant === "minimal" ? "8px" : "4px",
               }}
             >
               Curious?
