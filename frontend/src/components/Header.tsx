@@ -152,9 +152,9 @@ export function Header({
 
       <div 
         style={{
-          width: "35%",
-          maxWidth: "360px",
-          minWidth: "240px",
+          width: "50%",
+          maxWidth: "600px",
+          minWidth: "320px",
           overflow: "hidden",
       }}
     >

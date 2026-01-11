@@ -175,9 +175,9 @@ export function ProjectDetailPage() {
       >
         <div 
           style={{
-            width: "50%",
-            maxWidth: "600px",
-            minWidth: "320px",
+            width: "60%",
+            maxWidth: "800px",
+            minWidth: "400px",
             overflow: "hidden",
           }}
         >
