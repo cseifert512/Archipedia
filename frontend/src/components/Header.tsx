@@ -237,38 +237,24 @@ export function Header({
               />
               
               {!searchQuery && (
-                <>
-                  <div 
-                    className="absolute inset-0 flex items-end pb-0.5 pointer-events-none"
+                <div 
+                  className="absolute inset-0 flex items-end pb-0.5 pointer-events-none"
+                  style={{
+                    opacity: isPlaceholderVisible ? 1 : 0,
+                    transition: "opacity 500ms ease-in-out"
+                  }}
+                >
+                  <span 
                     style={{
-                      opacity: isPlaceholderVisible ? 1 : 0,
-                      transition: "opacity 500ms ease-in-out"
-                    }}
-                  >
-                    <span 
-                      style={{
-                        fontFamily: "var(--font-primary)",
-                        fontSize: "9px",
-                        color: "#000000",
-                        padding: `3px 6px 3px ${showRefresh ? '32px' : '22px'}`
-                      }}
-                    >
-                      {searchPlaceholders[placeholderIndex]}
-                    </span>
-                  </div>
-                  
-                  <div
-                    className="absolute right-1 top-1/2 transform -translate-y-1/2 pointer-events-none"
-                    style={{
-                      fontSize: "6px",
-                      color: "rgba(0,0,0,0.4)",
                       fontFamily: "var(--font-primary)",
-                      fontWeight: 300,
+                      fontSize: "9px",
+                      color: "#000000",
+                      padding: `3px 6px 3px ${showRefresh ? '32px' : '22px'}`
                     }}
                   >
-                    text + image
-                  </div>
-                </>
+                    {searchPlaceholders[placeholderIndex]}
+                  </span>
+                </div>
               )}
             </div>
 

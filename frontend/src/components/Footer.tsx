@@ -19,9 +19,9 @@ export function Footer({ variant = "default", logoLink = "/" }: FooterProps) {
     >
       <div 
         style={{
-          width: variant === "minimal" ? "40%" : "35%",
-          maxWidth: variant === "minimal" ? "480px" : "360px",
-          minWidth: variant === "minimal" ? "280px" : "240px",
+          width: variant === "minimal" ? "60%" : "50%",
+          maxWidth: variant === "minimal" ? "800px" : "600px",
+          minWidth: variant === "minimal" ? "400px" : "320px",
           overflow: "hidden",
         }}
       >
