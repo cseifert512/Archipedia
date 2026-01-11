@@ -105,16 +105,53 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
     setOutputCount(Math.min(...inputs.map(inp => inp.results?.length || 12)));
   };
 
-  // Calculate positions for connection handles based on expanded state
-  const inputHandleY = isExpanded ? 120 : 40;
-  const outputHandleY = isExpanded ? 450 : 40;
+  // Calculate positions for connection handles aligned with text labels
+  const headerHeight = isExpanded ? 48 : 32;
+  const currentMinHeight = isExpanded 
+    ? Math.max(500, headerHeight + 100 + inputs.length * 60)
+    : Math.max(90, headerHeight + 20 + inputs.length * 20);
+  
+  let inputHandleYPositions: number[];
+  let outputHandleY: number;
+  
+  if (isExpanded) {
+    // Expanded view: align with INPUTS and OUTPUT text labels
+    const contentPadding = 16;
+    const inputsSectionTop = headerHeight + contentPadding + 8; // Header + padding + margin to INPUTS label
+    const inputSpacing = 30;
+    const firstInputY = inputsSectionTop + 10; // Aligned with "INPUTS:" text
+    
+    inputHandleYPositions = inputs.map((_, index) => 
+      firstInputY + index * inputSpacing
+    );
+    
+    // OUTPUT section is near the bottom, align with "OUTPUT: Combined Results" text
+    const outputSectionTop = currentMinHeight - 80; // Approximate position of OUTPUT section
+    outputHandleY = outputSectionTop + 10; // Aligned with "OUTPUT:" text
+  } else {
+    // Collapsed view: center inputs
+    const contentStartY = headerHeight;
+    const contentHeight = currentMinHeight - headerHeight;
+    const contentCenterY = contentStartY + contentHeight / 2;
+    const inputSpacing = 20;
+    const totalInputHeight = inputs.length > 1 ? (inputs.length - 1) * inputSpacing : 0;
+    const firstInputY = contentCenterY - (totalInputHeight / 2);
+    
+    inputHandleYPositions = inputs.map((_, index) => 
+      firstInputY + index * inputSpacing
+    );
+    
+    outputHandleY = contentCenterY;
+  }
 
   return (
     <div
       className="rounded-lg overflow-visible cursor-move group transition-all"
       style={{
         width: isExpanded ? '400px' : '180px',
-        minHeight: isExpanded ? '500px' : '90px',
+        minHeight: isExpanded 
+          ? `${Math.max(500, headerHeight + 100 + inputs.length * 60)}px` 
+          : `${Math.max(90, headerHeight + 20 + inputs.length * 20)}px`,
         backgroundColor: '#FFFFFF',
         border: selected ? '2px solid #FF9F43' : '1px solid rgba(0,0,0,0.1)',
         borderRadius: isExpanded ? '12px' : '8px',
@@ -131,40 +168,89 @@ export const OperatorANDNode: React.FC<OperatorANDNodeProps> = ({
     >
       {/* Multiple Input Handles */}
       {inputs.map((_, index) => (
-        <Handle
-          key={`input-${index}`}
-          type="target"
-          position={Position.Left}
-          id={`input-${index}`}
+        <div
+          key={`input-wrapper-${index}`}
           style={{
-            left: isExpanded ? '-8px' : '-6px',
-            top: isExpanded ? `${inputHandleY + index * 30}px` : `${30 + index * 20}px`,
-            width: isExpanded ? '16px' : '12px',
-            height: isExpanded ? '16px' : '12px',
-            background: '#FF9F43',
-            border: '2px solid #FFFFFF',
-            borderRadius: '50%',
-            clipPath: isExpanded ? 'inset(0 50% 0 0)' : 'none',
+            position: 'absolute',
+            left: '-20px',
+            top: `${inputHandleYPositions[index]}px`,
+            transform: 'translateY(-50%)',
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'auto',
+            zIndex: 10,
           }}
-        />
+        >
+          <Handle
+            key={`input-${index}`}
+            type="target"
+            position={Position.Left}
+            id={`input-${index}`}
+            style={{
+              width: '40px',
+              height: '40px',
+              background: 'transparent',
+              border: 'none',
+              position: 'relative',
+            }}
+          />
+          <div
+            style={{
+              width: '12px',
+              height: '12px',
+              background: '#FF9F43',
+              border: '2px solid #FFFFFF',
+              borderRadius: '50%',
+              position: 'absolute',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
       ))}
       
       {/* Output Handle */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="output"
+      <div
         style={{
-          right: isExpanded ? '-8px' : '-6px',
+          position: 'absolute',
+          right: '-20px',
           top: isExpanded ? `${outputHandleY}px` : '50%',
-          width: isExpanded ? '16px' : '12px',
-          height: isExpanded ? '16px' : '12px',
-          background: '#FF9F43',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: isExpanded ? 'inset(0 0 0 50%)' : 'none',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="output"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#FF9F43',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
       
       {/* Header */}
       <div

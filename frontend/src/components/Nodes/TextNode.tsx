@@ -65,38 +65,86 @@ export const TextNode: React.FC<TextNodeProps> = ({
       }}
     >
       {/* Connection Handle - INPUT (Left side) */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="input"
+      <div
         style={{
-          left: '-8px',
+          position: 'absolute',
+          left: '-20px',
           top: `${inputHandleY}px`,
-          width: '16px',
-          height: '16px',
-          background: '#F5F1E8',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: 'inset(0 50% 0 0)',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="input"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#F5F1E8',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
 
       {/* Connection Handle - OUTPUT (Right side) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="output"
+      <div
         style={{
-          right: '-8px',
+          position: 'absolute',
+          right: '-20px',
           top: `${outputHandleY}px`,
-          width: '16px',
-          height: '16px',
-          background: '#F5F1E8',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: 'inset(0 0 0 50%)',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="output"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#F5F1E8',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
 
       {/* Header */}
       <div

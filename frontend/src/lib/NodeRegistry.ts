@@ -351,13 +351,190 @@ export const NODE_REGISTRY: Record<NodeType, NodeTypeDefinition> = {
       },
     ],
   },
+
+  attributeFilter: {
+    type: 'attributeFilter',
+    label: 'Attribute Filter',
+    description: 'Filter results by attributes with weighted scoring',
+    color: '#90EE90', // Light Green
+    category: 'analyze',
+    inputs: [
+      { id: 'input', label: 'Input', type: 'data' },
+      { id: 'results', label: 'Results', type: 'data' },
+    ],
+    outputs: [
+      { id: 'output', label: 'Filtered Results', type: 'data' },
+      { id: 'filtered', label: 'Filtered', type: 'data' },
+    ],
+    parameters: [
+      {
+        id: 'weights',
+        label: 'Weights',
+        type: 'text',
+        defaultValue: '{"visual": 1, "spatial": 1, "regional": 1}',
+        description: 'Weight configuration for filtering',
+      },
+    ],
+  },
+
+  scalar: {
+    type: 'scalar',
+    label: 'Scalar Constraints',
+    description: 'Apply scalar constraints to filter results',
+    color: '#4A90E2', // Blue
+    category: 'analyze',
+    inputs: [
+      { id: 'input', label: 'Input', type: 'data' },
+      { id: 'results', label: 'Results', type: 'data' },
+    ],
+    outputs: [
+      { id: 'output', label: 'Constrained Results', type: 'data' },
+      { id: 'matching', label: 'Matching', type: 'data' },
+    ],
+    parameters: [
+      {
+        id: 'constraints',
+        label: 'Constraints',
+        type: 'text',
+        defaultValue: '[]',
+        description: 'Array of scalar constraints',
+      },
+    ],
+  },
+
+  operatorAND: {
+    type: 'operatorAND',
+    label: 'AND Operator',
+    description: 'Combine multiple inputs with AND logic',
+    color: '#FF9F43', // Orange
+    category: 'control',
+    inputs: [
+      { id: 'input1', label: 'Input 1', type: 'data' },
+      { id: 'input2', label: 'Input 2', type: 'data' },
+      { id: 'input3', label: 'Input 3', type: 'data' },
+    ],
+    outputs: [
+      { id: 'output', label: 'Result', type: 'data' },
+      { id: 'combined', label: 'Combined', type: 'data' },
+    ],
+    parameters: [
+      {
+        id: 'logic',
+        label: 'Logic',
+        type: 'select',
+        defaultValue: 'weightedSum',
+        options: ['weightedSum', 'product'],
+        description: 'Combination logic method',
+      },
+    ],
+  },
+
+  operatorOR: {
+    type: 'operatorOR',
+    label: 'OR Operator',
+    description: 'Combine multiple inputs with OR logic',
+    color: '#9D7BE8', // Purple
+    category: 'control',
+    inputs: [
+      { id: 'input1', label: 'Input 1', type: 'data' },
+      { id: 'input2', label: 'Input 2', type: 'data' },
+      { id: 'input3', label: 'Input 3', type: 'data' },
+    ],
+    outputs: [
+      { id: 'output', label: 'Result', type: 'data' },
+      { id: 'merged', label: 'Merged', type: 'data' },
+    ],
+    parameters: [
+      {
+        id: 'logic',
+        label: 'Logic',
+        type: 'select',
+        defaultValue: 'hardMax',
+        options: ['hardMax', 'softmax'],
+        description: 'Combination logic method',
+      },
+    ],
+  },
+
+  operatorNOT: {
+    type: 'operatorNOT',
+    label: 'NOT Operator',
+    description: 'Exclude results using NOT logic',
+    color: '#FF6B6B', // Red
+    category: 'control',
+    inputs: [
+      { id: 'include', label: 'Include', type: 'data' },
+      { id: 'exclude', label: 'Exclude', type: 'data' },
+    ],
+    outputs: [
+      { id: 'output', label: 'Result', type: 'data' },
+      { id: 'filtered', label: 'Filtered', type: 'data' },
+    ],
+    parameters: [
+      {
+        id: 'exclusionStrategy',
+        label: 'Exclusion Strategy',
+        type: 'select',
+        defaultValue: 'mask',
+        options: ['mask', 'penalize'],
+        description: 'How to handle exclusions',
+      },
+      {
+        id: 'similarityThreshold',
+        label: 'Similarity Threshold',
+        type: 'number',
+        defaultValue: 0.5,
+        min: 0,
+        max: 1,
+        step: 0.1,
+        description: 'Threshold for similarity matching',
+      },
+    ],
+  },
+
+  results: {
+    type: 'results',
+    label: 'Results Node',
+    description: 'Display and manage project search results',
+    color: '#7B68EE', // Medium Slate Blue
+    category: 'organize',
+    inputs: [
+      { id: 'input', label: 'Input', type: 'data' },
+    ],
+    outputs: [
+      { id: 'output', label: 'Results', type: 'data' },
+    ],
+    parameters: [
+      {
+        id: 'resultCount',
+        label: 'Result Count',
+        type: 'number',
+        defaultValue: 0,
+        min: 0,
+        description: 'Number of results',
+      },
+    ],
+  },
 };
 
 /**
  * Get node type definition
  */
 export function getNodeTypeDefinition(type: NodeType): NodeTypeDefinition {
-  return NODE_REGISTRY[type];
+  if (NODE_REGISTRY[type]) {
+    return NODE_REGISTRY[type];
+  }
+  // Fallback for unknown node types
+  return {
+    type,
+    label: type.charAt(0).toUpperCase() + type.slice(1),
+    description: `Node type: ${type}`,
+    color: '#CCCCCC',
+    category: 'control',
+    inputs: [],
+    outputs: [],
+    parameters: [],
+  };
 }
 
 /**

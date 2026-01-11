@@ -103,9 +103,18 @@ export const ScalarNode: React.FC<ScalarNodeProps> = ({
 
   const availableToAdd = availableScalars.filter(s => !constraints.find(c => c.key === s.key));
 
-  // Calculate positions for connection handles
-  const inputHandleY = 120; // After header
-  const outputHandleY = 450; // At OUTPUT section
+  // Calculate positions for connection handles aligned with text labels
+  const headerHeight = 48;
+  const contentPadding = 16;
+  // Input handle aligned with "INPUT: Results from upstream" text
+  const inputSectionTop = headerHeight + contentPadding + 8; // Header + padding + margin to INPUT label
+  const inputHandleY = inputSectionTop + 10; // Aligned with "INPUT: Results from upstream" text
+  
+  // OUTPUT section is near the bottom, align with "OUTPUT: Constrained Results" text
+  // Calculate based on node height (500px) minus approximate footer/OUTPUT section position
+  const nodeHeight = 500;
+  const outputSectionTop = nodeHeight - 100; // Approximate position of OUTPUT section from top
+  const outputHandleY = outputSectionTop + 10; // Aligned with "OUTPUT:" text
 
   return (
     <div
@@ -127,38 +136,86 @@ export const ScalarNode: React.FC<ScalarNodeProps> = ({
       }}
     >
       {/* Connection Handle - INPUT (Left side) */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="input"
+      <div
         style={{
-          left: '-8px',
+          position: 'absolute',
+          left: '-20px',
           top: `${inputHandleY}px`,
-          width: '16px',
-          height: '16px',
-          background: '#4A90E2',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: 'inset(0 50% 0 0)',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="input"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#4A90E2',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
 
       {/* Connection Handle - OUTPUT (Right side) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="output"
+      <div
         style={{
-          right: '-8px',
+          position: 'absolute',
+          right: '-20px',
           top: `${outputHandleY}px`,
-          width: '16px',
-          height: '16px',
-          background: '#4A90E2',
-          border: '2px solid #FFFFFF',
-          borderRadius: '50%',
-          clipPath: 'inset(0 0 0 50%)',
+          transform: 'translateY(-50%)',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'auto',
+          zIndex: 10,
         }}
-      />
+      >
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="output"
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
+            position: 'relative',
+          }}
+        />
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            background: '#4A90E2',
+            border: '2px solid #FFFFFF',
+            borderRadius: '50%',
+            position: 'absolute',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
 
       {/* Header */}
       <div
@@ -251,6 +308,26 @@ export const ScalarNode: React.FC<ScalarNodeProps> = ({
       </div>
 
       <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+        {/* INPUT: Results from upstream */}
+        <div>
+          <div
+            style={{
+              fontFamily: 'var(--font-primary)',
+              fontSize: '10px',
+              fontWeight: 400,
+              color: '#000000',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginBottom: '8px',
+            }}
+          >
+            INPUT: Results from upstream
+          </div>
+          <div style={{ fontFamily: 'var(--font-primary)', fontSize: '11px', color: 'rgba(0,0,0,0.7)' }}>
+            ◉ Receives: Project list
+          </div>
+        </div>
+
         {/* PARAMETERS */}
         <div>
           <div

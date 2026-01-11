@@ -56,6 +56,7 @@
     },
     server: {
       port: 5173,
+      host: '0.0.0.0', // Listen on all network interfaces
       open: false,
     },
   });

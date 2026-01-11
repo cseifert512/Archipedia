@@ -128,8 +128,13 @@ class DividerBlockData(BaseModel):
     variant: str  # line, space-sm, space-lg
 
 
+class FrameBlockData(BaseModel):
+    title: Optional[str] = None
+    background: Optional[str] = None  # color or image URL
+
+
 class BlockCreate(BaseModel):
-    type: str  # reference, text, divider
+    type: str  # reference, text, divider, frame
     data: Dict[str, Any]
     position: Optional[float] = None
 
@@ -713,6 +718,7 @@ async def export_board(board_id: str, body: ExportRequest):
     Export a board to PDF.
     
     This uses Playwright to render the print-optimized view and generate a PDF.
+    For frame-based export (mode='slides'), frames define slide boundaries.
     """
     if not PLAYWRIGHT_AVAILABLE:
         return ExportResponse(
@@ -720,13 +726,23 @@ async def export_board(board_id: str, body: ExportRequest):
             error="PDF export is not available. Playwright is not installed."
         )
 
-    # Check board exists
+    # Check board exists and get blocks
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT id FROM boards WHERE id = ?", (board_id,))
-        if not cursor.fetchone():
+        cursor.execute("SELECT id, page_format FROM boards WHERE id = ?", (board_id,))
+        board_row = cursor.fetchone()
+        if not board_row:
             raise HTTPException(status_code=404, detail="Board not found")
+        
+        # Get blocks to check for frames
+        cursor.execute("SELECT * FROM blocks WHERE board_id = ? ORDER BY position", (board_id,))
+        blocks = [block_row_to_dict(r) for r in cursor.fetchall()]
+        
+        # Use board's page_format if format not specified
+        format_to_use = body.format
+        if format_to_use == "letter" and board_row["page_format"] in ["16:9", "4:3"]:
+            format_to_use = board_row["page_format"]
     finally:
         conn.close()
 
@@ -735,7 +751,7 @@ async def export_board(board_id: str, body: ExportRequest):
             board_id=board_id,
             frontend_url=body.frontend_url,
             mode=body.mode,
-            format=body.format,
+            format=format_to_use,
         )
 
         if pdf_path:

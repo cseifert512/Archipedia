@@ -31,6 +31,11 @@ export interface DividerBlockData {
   variant: 'line' | 'space-sm' | 'space-lg';
 }
 
+export interface FrameBlockData {
+  title?: string;
+  background?: string; // color or image URL
+}
+
 // ============ Block Types ============
 
 export interface ReferenceBlock {
@@ -54,7 +59,14 @@ export interface DividerBlock {
   data: DividerBlockData;
 }
 
-export type BoardBlock = ReferenceBlock | TextBlock | DividerBlock;
+export interface FrameBlock {
+  type: 'frame';
+  id: string;
+  position: number;
+  data: FrameBlockData;
+}
+
+export type BoardBlock = ReferenceBlock | TextBlock | DividerBlock | FrameBlock;
 
 // ============ Layout Types ============
 
@@ -114,7 +126,7 @@ interface BoardState {
   
   // Board CRUD
   createBoard: (title?: string, layoutMode?: LayoutMode) => Board;
-  createBoardWithTemplate: (title?: string) => Board;
+  createBoardWithTemplate: (title?: string, template?: 'moodboard' | 'precedent' | 'slides') => Board;
   deleteBoard: (boardId: string) => void;
   updateBoard: (boardId: string, updates: Partial<Pick<Board, 'title' | 'subtitle' | 'description' | 'cover_image_url' | 'layout_preset' | 'layout_mode' | 'page_format'>>) => void;
   setActiveBoard: (boardId: string | null) => void;
@@ -126,6 +138,7 @@ interface BoardState {
   addReferenceBlock: (boardId: string, data: Omit<ReferenceBlockData, 'caption' | 'tags'>) => void;
   addTextBlock: (boardId: string, style: TextBlockData['style'], text: string, afterBlockId?: string) => void;
   addDividerBlock: (boardId: string, variant: DividerBlockData['variant'], afterBlockId?: string) => void;
+  addFrameBlock: (boardId: string, title?: string, afterBlockId?: string) => void;
   updateBlock: (boardId: string, blockId: string, updates: Partial<BoardBlock['data']>) => void;
   updateBlockCaption: (boardId: string, blockId: string, caption: string) => void;
   updateBlockImage: (boardId: string, blockId: string, imageId: string, thumbUrl: string, imageUrl?: string) => void;
@@ -239,114 +252,105 @@ export const useBoardStore = create<BoardState>()(
         return newBoard;
       },
 
-      createBoardWithTemplate: (title = 'Research Board') => {
-        // Create template blocks with narrative structure
-        const templateBlocks: BoardBlock[] = [
-          {
-            type: 'text',
-            id: generateId(),
-            position: 0,
-            data: {
-              style: 'h1',
-              text: 'Design Intent',
+      createBoardWithTemplate: (title = 'Research Board', template: 'moodboard' | 'precedent' | 'slides' = 'moodboard') => {
+        let templateBlocks: BoardBlock[] = [];
+        let boardTitle = title;
+        let boardSubtitle = '';
+        let layoutPreset: LayoutPreset = 'grid';
+        let pageFormat: PageFormat = 'web';
+
+        if (template === 'moodboard') {
+          boardTitle = title || 'Moodboard';
+          boardSubtitle = 'A visual collection of architectural references';
+          layoutPreset = 'masonry';
+          templateBlocks = [
+            {
+              type: 'text',
+              id: generateId(),
+              position: 0,
+              data: {
+                style: 'h1',
+                text: boardTitle,
+              },
             },
-          },
-          {
-            type: 'text',
-            id: generateId(),
-            position: 1,
-            data: {
-              style: 'body',
-              text: 'Add reference projects that exemplify the design direction...',
+          ];
+        } else if (template === 'precedent') {
+          boardTitle = title || 'Precedent Comparison';
+          boardSubtitle = 'Compare architectural precedents side by side';
+          layoutPreset = 'grid';
+          templateBlocks = [
+            {
+              type: 'frame',
+              id: generateId(),
+              position: 0,
+              data: {
+                title: 'Overview',
+              },
             },
-          },
-          {
-            type: 'divider',
-            id: generateId(),
-            position: 2,
-            data: {
-              variant: 'space-lg',
+            {
+              type: 'text',
+              id: generateId(),
+              position: 1,
+              data: {
+                style: 'h2',
+                text: 'Key References',
+              },
             },
-          },
-          {
-            type: 'text',
-            id: generateId(),
-            position: 3,
-            data: {
-              style: 'h2',
-              text: 'Spatial Strategy',
+            {
+              type: 'frame',
+              id: generateId(),
+              position: 2,
+              data: {
+                title: 'Comparison',
+              },
             },
-          },
-          {
-            type: 'text',
-            id: generateId(),
-            position: 4,
-            data: {
-              style: 'body',
-              text: 'Explore how similar projects organize space and circulation...',
+            {
+              type: 'text',
+              id: generateId(),
+              position: 3,
+              data: {
+                style: 'h2',
+                text: 'Analysis',
+              },
             },
-          },
-          {
-            type: 'divider',
-            id: generateId(),
-            position: 5,
-            data: {
-              variant: 'space-lg',
-            },
-          },
-          {
-            type: 'text',
-            id: generateId(),
-            position: 6,
-            data: {
-              style: 'h2',
-              text: 'Material Palette',
-            },
-          },
-          {
-            type: 'text',
-            id: generateId(),
-            position: 7,
-            data: {
-              style: 'body',
-              text: 'Collect precedents that inform material and finish decisions...',
-            },
-          },
-          {
-            type: 'divider',
-            id: generateId(),
-            position: 8,
-            data: {
-              variant: 'space-lg',
-            },
-          },
-          {
-            type: 'text',
-            id: generateId(),
-            position: 9,
-            data: {
-              style: 'h2',
-              text: 'Key Takeaways',
-            },
-          },
-          {
-            type: 'text',
-            id: generateId(),
-            position: 10,
-            data: {
-              style: 'body',
-              text: 'Summarize the main insights and design principles...',
-            },
-          },
-        ];
+          ];
+        } else if (template === 'slides') {
+          boardTitle = title || 'Slide Deck';
+          boardSubtitle = 'Presentation-ready slide deck';
+          layoutPreset = 'slides';
+          pageFormat = '16:9';
+          // Create 3-6 frames for a slide deck
+          for (let i = 0; i < 4; i++) {
+            templateBlocks.push({
+              type: 'frame',
+              id: generateId(),
+              position: i,
+              data: {
+                title: `Slide ${i + 1}`,
+              },
+            });
+            if (i === 0) {
+              // Add title text to first slide
+              templateBlocks.push({
+                type: 'text',
+                id: generateId(),
+                position: i + 0.5,
+                data: {
+                  style: 'h1',
+                  text: boardTitle,
+                },
+              });
+            }
+          }
+        }
 
         const newBoard: Board = {
           id: generateId(),
-          title,
-          subtitle: 'A curated collection of architectural precedents',
-          layout_preset: 'grid',
+          title: boardTitle,
+          subtitle: boardSubtitle,
+          layout_preset: layoutPreset,
           layout_mode: 'grid',
-          page_format: 'web',
+          page_format: pageFormat,
           share_token: generateShareToken(),
           blocks: templateBlocks,
           created_at: new Date().toISOString(),
@@ -495,6 +499,38 @@ export const useBoardStore = create<BoardState>()(
           id: generateId(),
           position: insertIndex,
           data: { variant },
+        };
+
+        const newBlocks = [...board.blocks];
+        newBlocks.splice(insertIndex, 0, newBlock);
+        const repositionedBlocks = newBlocks.map((b, i) => ({ ...b, position: i }));
+
+        set((state) => ({
+          boards: state.boards.map((b) =>
+            b.id === boardId
+              ? { ...b, blocks: repositionedBlocks, updated_at: new Date().toISOString() }
+              : b
+          ),
+          lastSaved: new Date().toISOString(),
+        }));
+      },
+
+      addFrameBlock: (boardId, title = 'New Slide', afterBlockId) => {
+        const state = get();
+        const board = state.boards.find((b) => b.id === boardId);
+        if (!board) return;
+
+        let insertIndex = board.blocks.length;
+        if (afterBlockId) {
+          const afterIndex = board.blocks.findIndex((b) => b.id === afterBlockId);
+          if (afterIndex !== -1) insertIndex = afterIndex + 1;
+        }
+
+        const newBlock: FrameBlock = {
+          type: 'frame',
+          id: generateId(),
+          position: insertIndex,
+          data: { title },
         };
 
         const newBlocks = [...board.blocks];
