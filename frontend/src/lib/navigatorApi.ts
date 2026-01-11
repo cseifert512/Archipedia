@@ -235,32 +235,48 @@ export async function getProjectDetails(projectId: string): Promise<ProjectDetai
 
 export function getImageUrl(imageId: string): string {
   // R2 CDN URL for images
-  // Structure: {R2_BASE}/{folder}/{filename}.jpg
-  // Where folder = project_id with category suffix (e.g., p_xxx_exteriors_p_xxx)
-  // And filename = folder + _exterior_N or _interior_N or _diagram_N
+  // Structure: {R2_BASE}/{project_id}/{project_id}_image_NN.jpg
   const R2_BASE = "https://pub-12350662edb244568152a5b72ed1dbb8.r2.dev";
   
   // Strip 'i_' prefix if present
   const cleanId = imageId.startsWith('i_') ? imageId.slice(2) : imageId;
   
-  // The cleanId format is: {folder}_{folder}_{type}_{N}
-  // Example: p_xxx_exteriors_p_xxx_p_xxx_exteriors_p_xxx_exterior_1
-  // We need to extract folder and construct: {folder}/{folder}_{type}_{N}.jpg
-  
-  // Find the type suffix (exterior_N, interior_N, diagram_N) at the end
-  const suffixMatch = cleanId.match(/_(exterior|interior|diagram)_(\d+)$/);
-  if (suffixMatch) {
-    const suffix = suffixMatch[0]; // e.g., "_exterior_1"
+  // Handle the image_NN suffix format (most common)
+  // Format: p_xxx_image_01 or p_xxx_p_xxx_image_01 (duplicated project ID)
+  const imageSuffixMatch = cleanId.match(/_image_(\d+)$/);
+  if (imageSuffixMatch) {
+    const suffix = imageSuffixMatch[0]; // e.g., "_image_01"
     const beforeSuffix = cleanId.slice(0, -suffix.length);
     
-    // beforeSuffix is {folder}_{folder} - we split at midpoint
-    // The format is: folder + "_" + folder, so length = 2*folder.length + 1
-    // midpoint gives us the underscore position
+    // Check if project_id is duplicated (format: p_xxx_p_xxx)
+    // Split at midpoint and check if both halves match
     const midpoint = Math.floor(beforeSuffix.length / 2);
     const firstHalf = beforeSuffix.slice(0, midpoint);
     const secondHalf = beforeSuffix.slice(midpoint);
     
-    // Check if they match (secondHalf starts with underscore and rest equals firstHalf)
+    if (secondHalf.startsWith('_') && firstHalf === secondHalf.slice(1)) {
+      // Duplicated format: use just the first half as project_id
+      const projectId = firstHalf;
+      const filename = projectId + suffix;
+      return `${R2_BASE}/${projectId}/${filename}.jpg`;
+    } else {
+      // Non-duplicated format: beforeSuffix is the project_id
+      const projectId = beforeSuffix;
+      const filename = projectId + suffix;
+      return `${R2_BASE}/${projectId}/${filename}.jpg`;
+    }
+  }
+  
+  // Handle exterior_N, interior_N, diagram_N suffix formats (legacy)
+  const legacySuffixMatch = cleanId.match(/_(exterior|interior|diagram)_(\d+)$/);
+  if (legacySuffixMatch) {
+    const suffix = legacySuffixMatch[0];
+    const beforeSuffix = cleanId.slice(0, -suffix.length);
+    
+    const midpoint = Math.floor(beforeSuffix.length / 2);
+    const firstHalf = beforeSuffix.slice(0, midpoint);
+    const secondHalf = beforeSuffix.slice(midpoint);
+    
     if (secondHalf.startsWith('_') && firstHalf === secondHalf.slice(1)) {
       const folder = firstHalf;
       const filename = folder + suffix;
@@ -268,7 +284,7 @@ export function getImageUrl(imageId: string): string {
     }
   }
   
-  // Fallback: try to use as-is (won't work but provides a URL)
+  // Fallback: assume cleanId is project_id_image_NN format
   return `${R2_BASE}/${cleanId}/${cleanId}.jpg`;
 }
 
