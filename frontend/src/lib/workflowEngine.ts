@@ -117,6 +117,14 @@ export function getNodeInputs(
       const outputKey = edge.sourceHandle || 'output';
 
       inputs[inputKey] = sourceResult.outputs[outputKey];
+      
+      // Also pass through results and projects if they exist (for ResultsNode consumption)
+      if (sourceResult.outputs.results && !inputs.results) {
+        inputs.results = sourceResult.outputs.results;
+      }
+      if (sourceResult.outputs.projects && !inputs.projects) {
+        inputs.projects = sourceResult.outputs.projects;
+      }
     }
   });
 
@@ -168,6 +176,9 @@ export async function executeNode(
 
       case 'operatorAND':
         return executeOperatorANDNode(node, context);
+
+      case 'results':
+        return executeResultsNode(node, context);
 
       default:
         return {
@@ -554,6 +565,63 @@ async function executeCollectionNode(
       output: [...items, ...allInputs],
       collection: [...items, ...allInputs],
       count: items.length + allInputs.length,
+    },
+    status: 'success',
+  };
+}
+
+/**
+ * Execute results node - passes through and aggregates results from upstream nodes
+ */
+async function executeResultsNode(
+  _node: Node<NodeData>,
+  context: NodeExecutionContext
+): Promise<NodeExecutionResult> {
+  // Collect all results and projects from upstream nodes
+  const allResults: any[] = [];
+  const allProjects: PrecedentProject[] = [];
+  
+  // Process all inputs (from connected upstream nodes)
+  for (const inputKey of Object.keys(context.inputs)) {
+    const input = context.inputs[inputKey];
+    
+    // Handle direct results arrays
+    if (Array.isArray(input)) {
+      allResults.push(...input);
+    }
+    // Handle objects with results/projects properties
+    else if (input && typeof input === 'object') {
+      if (input.results && Array.isArray(input.results)) {
+        allResults.push(...input.results);
+      }
+      if (input.projects && Array.isArray(input.projects)) {
+        allProjects.push(...input.projects);
+      }
+    }
+  }
+  
+  // Also check for direct results/projects in inputs (from edge connections)
+  if (context.inputs.results && Array.isArray(context.inputs.results)) {
+    allResults.push(...context.inputs.results);
+  }
+  if (context.inputs.projects && Array.isArray(context.inputs.projects)) {
+    allProjects.push(...context.inputs.projects);
+  }
+  
+  // Deduplicate by id
+  const uniqueResults = allResults.filter((r, i, arr) => 
+    arr.findIndex(x => (x.project_id || x.id) === (r.project_id || r.id)) === i
+  );
+  const uniqueProjects = allProjects.filter((p, i, arr) => 
+    arr.findIndex(x => x.id === p.id) === i
+  );
+  
+  return {
+    outputs: {
+      output: uniqueProjects,
+      results: uniqueResults,
+      projects: uniqueProjects,
+      count: uniqueProjects.length || uniqueResults.length,
     },
     status: 'success',
   };

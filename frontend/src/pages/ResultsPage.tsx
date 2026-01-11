@@ -201,7 +201,7 @@ export function ResultsPage() {
     }
   }, [imageParam, addNodes]);
   
-  // Create a text node with query and auto-execute when coming from Advanced Canvas search
+  // Create a text node with query, connect to a results node, and auto-execute
   useEffect(() => {
     const query = initialSearchQuery.trim();
     if (!query) return;
@@ -210,18 +210,41 @@ export function ResultsPage() {
     
     queryParamHandledRef.current = true;
     
-    // Create a text node with the search query at a central position
+    // Create a text node with the search query
     const textNode = createTextNode(
       { x: 200, y: 150 },
       query
     );
     
-    addNodes([textNode]);
+    // Create a results node positioned to the right of the text node
+    const resultsNode = createResultsNode(
+      { x: 650, y: 100 },
+      0
+    );
     
-    // Execute the text node after a brief delay to ensure it's added to the store
+    // Add both nodes
+    const { addEdges } = useCanvasStore.getState();
+    addNodes([textNode, resultsNode]);
+    
+    // Create an edge connecting text node output to results node input
+    const edge = {
+      id: `edge-${textNode.id}-${resultsNode.id}`,
+      source: textNode.id,
+      sourceHandle: 'output',
+      target: resultsNode.id,
+      targetHandle: 'input',
+    };
+    
+    // Add the edge after a brief delay to ensure nodes are added
     setTimeout(() => {
-      const { executeFromNode } = useCanvasStore.getState();
-      executeFromNode(textNode.id);
+      addEdges([edge]);
+      
+      // Execute from the results node (triggers upstream text node first)
+      const { executeFromNode, setSelectedNodes } = useCanvasStore.getState();
+      executeFromNode(resultsNode.id).then(() => {
+        // Select the results node after execution so its results appear in the panel
+        setSelectedNodes([resultsNode.id]);
+      });
     }, 100);
   }, [initialSearchQuery, nodes.length, addNodes]);
 
