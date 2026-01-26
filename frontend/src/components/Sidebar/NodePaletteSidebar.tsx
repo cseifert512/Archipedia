@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Type, ImageIcon, Grid3X3, Settings, Search, Filter, Ruler, Circle, GitMerge, Minus, FolderOpen, Plus, ChevronDown, ChevronUp, Trash2, Sparkles, CheckCircle, Palette } from 'lucide-react';
+import { Type, ImageIcon, Grid3X3, Settings, Search, Filter, Ruler, Circle, GitMerge, Minus, FolderOpen, Plus, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Trash2, Sparkles, CheckCircle, Palette } from 'lucide-react';
 import { Node, Edge } from 'reactflow';
 import { NodeData } from '../../types/nodes';
 
@@ -52,6 +52,7 @@ export const NodePaletteSidebar: React.FC<NodePaletteSidebarProps> = ({
   currentNodes = [],
   currentEdges = [],
 }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
 
@@ -92,14 +93,65 @@ export const NodePaletteSidebar: React.FC<NodePaletteSidebarProps> = ({
         position: 'fixed',
         left: '20px',
         top: '120px',
-        width: '180px',
+        width: isCollapsed ? '40px' : '180px',
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
         zIndex: 40,
+        transition: 'width 200ms ease',
       }}
     >
-      {nodeTypes.map((node) => {
+      {/* Collapse/Expand Toggle Button */}
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        style={{
+          width: '100%',
+          height: '36px',
+          borderRadius: '8px',
+          backgroundColor: 'rgba(255,255,255,0.95)',
+          border: '1px solid rgba(0,0,0,0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isCollapsed ? 'center' : 'space-between',
+          padding: isCollapsed ? '0' : '0 12px',
+          cursor: 'pointer',
+          transition: 'all 200ms ease',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+          marginBottom: '4px',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.95)';
+        }}
+      >
+        {!isCollapsed && (
+          <span
+            style={{
+              fontFamily: 'var(--font-primary)',
+              fontSize: '10px',
+              fontWeight: 500,
+              color: 'rgba(0,0,0,0.5)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Nodes
+          </span>
+        )}
+        {isCollapsed ? (
+          <ChevronRight size={16} color="rgba(0,0,0,0.5)" />
+        ) : (
+          <ChevronLeft size={16} color="rgba(0,0,0,0.5)" />
+        )}
+      </button>
+
+      {/* Node type buttons - only show when expanded */}
+      {!isCollapsed && nodeTypes.map((node) => {
         const IconComponent = node.icon;
         return (
           <button
@@ -146,7 +198,8 @@ export const NodePaletteSidebar: React.FC<NodePaletteSidebarProps> = ({
         );
       })}
       
-      {/* Templates Button - Separated */}
+      {/* Templates Button - Separated (only show when expanded) */}
+      {!isCollapsed && (
       <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
@@ -330,6 +383,7 @@ export const NodePaletteSidebar: React.FC<NodePaletteSidebarProps> = ({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

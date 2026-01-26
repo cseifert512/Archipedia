@@ -9,6 +9,7 @@ import { NodeCanvas } from "../components/Canvas/NodeCanvas";
 import { NodePaletteSidebar } from "../components/Sidebar/NodePaletteSidebar";
 import { ResultsGridCompact } from "../components/SearchResults/ResultsGridCompact";
 import { PrecedentProject } from "../types/nodes";
+import { UserButton } from "../components/UserButton";
 import { 
   createTextNode, 
   createImageNode, 
@@ -493,6 +494,25 @@ export function ResultsPage() {
           >
             RUN
           </button>
+        </div>
+
+        {/* Canvas Top-Right Controls - Profile Button */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            zIndex: 30,
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            padding: '6px 10px',
+            borderRadius: '8px',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+          }}
+        >
+          <UserButton />
         </div>
 
         {/* Canvas Content */}
