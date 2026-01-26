@@ -4,7 +4,7 @@ import { Node, Edge, Connection, addEdge, applyNodeChanges, applyEdgeChanges, No
 import { NodeData } from '../types/nodes';
 import { executeNode, getNodeInputs, topologicalSort, NodeExecutionResult } from '../lib/workflowEngine';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env?.DEV ? '' : (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8000');
 
 // ============ Types ============
 

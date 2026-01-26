@@ -95,6 +95,10 @@ async function parseErrorResponse(res: Response): Promise<SearchError> {
 
 function getApiBaseUrl(): string {
   const raw = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+  // In dev mode with Vite proxy, use empty string for relative URLs
+  if (raw === undefined && import.meta.env?.DEV) {
+    return "";
+  }
   return (raw && raw.trim()) ? raw.trim().replace(/\/+$/, "") : "http://localhost:8000";
 }
 

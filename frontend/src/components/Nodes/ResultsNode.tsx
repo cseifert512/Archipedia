@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
-import { ResultsNodeData } from '../../types/nodes';
+import { ResultsNodeData, PrecedentProject } from '../../types/nodes';
 import { Grid3x3, X, Play, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
+import { toAbsoluteUrl } from '../../lib/navigatorApi';
 
 interface ResultsNodeProps {
   data: ResultsNodeData;
@@ -18,6 +19,7 @@ export const ResultsNode: React.FC<ResultsNodeProps> = ({
   const { deleteNode, executeFromNode, nodes } = useCanvasStore();
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [resultCount, setResultCount] = useState(data.resultCount || 0);
+  const [projects, setProjects] = useState<PrecedentProject[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Watch for execution results
@@ -28,7 +30,19 @@ export const ResultsNode: React.FC<ResultsNodeProps> = ({
         const nodeData = node.data as any;
         if (nodeData.executionStatus === 'success') {
           setStatus('success');
-          setResultCount(nodeData.executionResult?.count || nodeData.executionResult?.results?.length || nodeData.resultCount || 0);
+          const results = nodeData.executionResult?.results || [];
+          const projectList = nodeData.executionResult?.projects || [];
+          setResultCount(nodeData.executionResult?.count || results.length || projectList.length || 0);
+          // Build projects from results if projects array is empty
+          if (projectList.length > 0) {
+            setProjects(projectList);
+          } else if (results.length > 0) {
+            setProjects(results.map((r: any) => ({
+              id: r.project_id || r.image_id || r.id || '',
+              title: r.title || r.project_id || 'Result',
+              thumbnail: toAbsoluteUrl(r.thumb_url) || '',
+            })));
+          }
           setErrorMessage(null);
         } else if (nodeData.executionStatus === 'error') {
           setStatus('error');
@@ -313,20 +327,73 @@ export const ResultsNode: React.FC<ResultsNodeProps> = ({
               marginTop: '8px',
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '4px',
+              gap: '8px',
+              maxHeight: '280px',
+              overflowY: 'auto',
+              padding: '4px',
             }}
           >
-            {Array.from({ length: 9 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  aspectRatio: '1',
-                  backgroundColor: '#7B68EE',
-                  borderRadius: '4px',
-                  opacity: 0.6,
-                }}
-              />
-            ))}
+            {projects.length > 0 ? (
+              projects.slice(0, 12).map((project, i) => (
+                <div
+                  key={project.id || i}
+                  style={{
+                    width: '100%',
+                    paddingBottom: '100%', // Force square aspect ratio
+                    backgroundColor: '#f0f0f0',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
+                  title={project.title}
+                >
+                  {project.thumbnail ? (
+                    <img
+                      src={project.thumbnail}
+                      alt={project.title}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: '#7B68EE',
+                        opacity: 0.4,
+                      }}
+                    />
+                  )}
+                </div>
+              ))
+            ) : (
+              // Show placeholder boxes when no results yet
+              Array.from({ length: 9 }).map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: '100%',
+                    paddingBottom: '100%',
+                    backgroundColor: '#7B68EE',
+                    borderRadius: '4px',
+                    opacity: 0.3,
+                    position: 'relative',
+                  }}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>
