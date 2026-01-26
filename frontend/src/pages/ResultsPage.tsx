@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { mockProjects } from "../lib/mockData";
 import { useSearchStore, SearchResult } from "../stores/searchStore";
 import { searchByText, toAbsoluteUrl } from "../lib/navigatorApi";
@@ -53,6 +54,7 @@ export function ResultsPage() {
   const setFusionWeights = setCanvasFusionWeights;
 
   const [selectedNodeType, setSelectedNodeType] = useState<string | null>(null);
+  const [researchPanelCollapsed, setResearchPanelCollapsed] = useState(false);
   const { nodes, edges, addNodes, executeWorkflow, selectedNodes } = useCanvasStore();
   
   // Get selected node's execution results (if any)
@@ -808,13 +810,18 @@ export function ResultsPage() {
           minWidth: 0,
         }}
       >
-        {/* Section 1: Design Agent Header + Mode Toggle + Search */}
+        {/* Section 1: Research Header (collapsible toggle) */}
         <div
           style={{
             borderBottom: '1px solid rgba(0,0,0,0.1)',
             padding: '12px 16px',
             flexShrink: 0,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
           }}
+          onClick={() => setResearchPanelCollapsed(!researchPanelCollapsed)}
         >
           <h3
             style={{
@@ -824,81 +831,98 @@ export function ResultsPage() {
               color: '#000000',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-              marginBottom: '8px',
+              margin: 0,
             }}
           >
             Research
           </h3>
-
-          {/* Search Input */}
-          <input
-            type="text"
-            placeholder="Search precedents (e.g., courtyard buildings...)"
-            value={currentSearchQuery}
-            onChange={(e) => {
-              setCurrentSearchQuery(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && currentSearchQuery.trim() && !isSearching) {
-                performTextSearch(currentSearchQuery);
-              }
-            }}
-            style={{
-              fontFamily: 'var(--font-primary)',
-              fontSize: '12px',
-              padding: '10px 12px',
-              width: '100%',
-              border: '1px solid rgba(0,0,0,0.1)',
-              borderRadius: '6px',
-              boxSizing: 'border-box',
-              backgroundColor: 'white',
-            }}
-          />
-          
-          {/* Help Text - Show when no search has been performed */}
-          {!hasSearched && (
-            <div
-              style={{
-                marginTop: '12px',
-                padding: '12px',
-                backgroundColor: 'rgba(0,0,0,0.02)',
-                borderRadius: '6px',
-                fontFamily: 'var(--font-primary)',
-                fontSize: '10px',
-                lineHeight: '1.5',
-                color: 'rgba(0,0,0,0.7)',
-              }}
-            >
-              <div style={{ fontWeight: 500, marginBottom: '6px', color: '#000000' }}>
-                How to use this page:
-              </div>
-              <div style={{ marginBottom: '4px' }}>
-                • Type your search query above and press Enter to find architectural precedents
-              </div>
-              <div style={{ marginBottom: '4px' }}>
-                • Adjust the Fusion Weights below to prioritize Visual, Spatial, or Regional similarity
-              </div>
-              <div style={{ marginBottom: '4px' }}>
-                • Use Filters to narrow down by typology or climate
-              </div>
-              <div>
-                • Drag projects from the results onto the canvas to create precedent nodes
-              </div>
-            </div>
+          {researchPanelCollapsed ? (
+            <ChevronDown size={16} color="rgba(0,0,0,0.5)" />
+          ) : (
+            <ChevronUp size={16} color="rgba(0,0,0,0.5)" />
           )}
         </div>
 
-        {/* Section 2: Fusion Weights + Filters */}
-        <div
-          style={{
-            borderBottom: '1px solid rgba(0,0,0,0.1)',
-            padding: '12px 16px',
-            flexShrink: 0,
-            height: hasSearched ? '25%' : 'auto',
-            overflowY: 'auto',
-            maxHeight: hasSearched ? '25%' : 'none',
-          }}
-        >
+        {/* Collapsible Section: Search + Fusion Weights + Filters */}
+        {!researchPanelCollapsed && (
+          <>
+            {/* Search Input Section */}
+            <div
+              style={{
+                borderBottom: '1px solid rgba(0,0,0,0.1)',
+                padding: '12px 16px',
+                flexShrink: 0,
+              }}
+            >
+              {/* Search Input */}
+              <input
+                type="text"
+                placeholder="Search precedents (e.g., courtyard buildings...)"
+                value={currentSearchQuery}
+                onChange={(e) => {
+                  setCurrentSearchQuery(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && currentSearchQuery.trim() && !isSearching) {
+                    performTextSearch(currentSearchQuery);
+                  }
+                }}
+                style={{
+                  fontFamily: 'var(--font-primary)',
+                  fontSize: '12px',
+                  padding: '10px 12px',
+                  width: '100%',
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  borderRadius: '6px',
+                  boxSizing: 'border-box',
+                  backgroundColor: 'white',
+                }}
+              />
+              
+              {/* Help Text - Show when no search has been performed */}
+              {!hasSearched && (
+                <div
+                  style={{
+                    marginTop: '12px',
+                    padding: '12px',
+                    backgroundColor: 'rgba(0,0,0,0.02)',
+                    borderRadius: '6px',
+                    fontFamily: 'var(--font-primary)',
+                    fontSize: '10px',
+                    lineHeight: '1.5',
+                    color: 'rgba(0,0,0,0.7)',
+                  }}
+                >
+                  <div style={{ fontWeight: 500, marginBottom: '6px', color: '#000000' }}>
+                    How to use this page:
+                  </div>
+                  <div style={{ marginBottom: '4px' }}>
+                    • Type your search query above and press Enter to find architectural precedents
+                  </div>
+                  <div style={{ marginBottom: '4px' }}>
+                    • Adjust the Fusion Weights below to prioritize Visual, Spatial, or Regional similarity
+                  </div>
+                  <div style={{ marginBottom: '4px' }}>
+                    • Use Filters to narrow down by typology or climate
+                  </div>
+                  <div>
+                    • Drag projects from the results onto the canvas to create precedent nodes
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section 2: Fusion Weights + Filters */}
+            <div
+              style={{
+                borderBottom: '1px solid rgba(0,0,0,0.1)',
+                padding: '12px 16px',
+                flexShrink: 0,
+                height: hasSearched ? '25%' : 'auto',
+                overflowY: 'auto',
+                maxHeight: hasSearched ? '25%' : 'none',
+              }}
+            >
           {/* Fusion Weights */}
           <div style={{ marginBottom: '16px' }}>
             <h3
@@ -1021,7 +1045,9 @@ export function ResultsPage() {
               })}
             </div>
           </div>
-        </div>
+            </div>
+          </>
+        )}
 
         {/* Section 3: Results Grid - Show when user has searched, when a node with results is selected, or when any search has been performed */}
         {(hasSearched || selectedNodeResults || searchResults.length > 0) && (

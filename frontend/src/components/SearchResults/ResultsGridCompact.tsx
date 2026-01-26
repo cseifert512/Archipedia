@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'wouter';
 import { SearchResult } from '../../stores/searchStore';
 
 interface ResultsGridCompactProps {
@@ -16,6 +17,7 @@ export const ResultsGridCompact: React.FC<ResultsGridCompactProps> = ({
   weights,
   onDragStart,
 }) => {
+  const [, setLocation] = useLocation();
   // Calculate fused scores and rank
   const rankedProjects = [...projects]
     .map((p) => {
@@ -43,13 +45,12 @@ export const ResultsGridCompact: React.FC<ResultsGridCompactProps> = ({
           key={project.id}
           draggable
           onDragStart={(e) => onDragStart(e, project)}
-          onClick={(e) => {
+          onDoubleClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            // Open project detail page in new tab
+            // Navigate to project detail page
             const projectId = project.id || project.name || 'unknown';
-            console.log('[DEBUG] Click opening project:', projectId);
-            window.open(`/project/${encodeURIComponent(projectId)}`, '_blank');
+            setLocation(`/project/${encodeURIComponent(projectId)}`);
           }}
           className="group"
           style={{

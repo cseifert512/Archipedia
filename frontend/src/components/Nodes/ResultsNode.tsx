@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
+import { useLocation } from 'wouter';
 import { ResultsNodeData, PrecedentProject } from '../../types/nodes';
 import { Grid3x3, X, Play, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
@@ -16,6 +17,7 @@ export const ResultsNode: React.FC<ResultsNodeProps> = ({
   selected,
   id,
 }) => {
+  const [, setLocation] = useLocation();
   const { deleteNode, executeFromNode, nodes } = useCanvasStore();
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [resultCount, setResultCount] = useState(data.resultCount || 0);
@@ -344,8 +346,25 @@ export const ResultsNode: React.FC<ResultsNodeProps> = ({
                     borderRadius: '4px',
                     overflow: 'hidden',
                     position: 'relative',
+                    cursor: 'pointer',
+                    transition: 'transform 150ms ease, box-shadow 150ms ease',
                   }}
-                  title={project.title}
+                  title={`${project.title} (double-click to open)`}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    const projectId = project.id || '';
+                    if (projectId) {
+                      setLocation(`/project/${encodeURIComponent(projectId)}`);
+                    }
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 >
                   {project.thumbnail ? (
                     <img
