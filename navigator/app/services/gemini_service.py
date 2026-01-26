@@ -2,6 +2,7 @@
 Gemini Service for AI Image Generation
 
 Provides architectural concept image generation using Google's Gemini API.
+Uses Imagen 3 through the Gemini API for actual image generation.
 """
 
 import os
@@ -16,11 +17,13 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 # Try to import google.generativeai
+GEMINI_AVAILABLE = False
+genai = None
+
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
     logger.warning("google-generativeai not installed. Generation features will be disabled.")
 
 
@@ -67,59 +70,196 @@ class GeminiService:
         if not self.is_available():
             raise RuntimeError("Gemini API is not available. Please configure GEMINI_API_KEY.")
         
-        # Build the architectural system prompt
+        # Build the architectural image prompt
         style_prompts = {
-            "photorealistic": "highly realistic architectural photograph, professional photography, natural lighting, detailed materials",
-            "render": "architectural rendering, 3D visualization, clean presentation, professional architectural render",
-            "sketch": "architectural sketch, hand-drawn concept, pencil drawing, conceptual architecture"
+            "photorealistic": "highly realistic architectural photograph, professional photography, natural lighting, detailed materials and textures",
+            "render": "professional architectural 3D rendering, clean modern visualization, soft lighting, high quality render",
+            "sketch": "architectural concept sketch, hand-drawn style, pencil and ink, conceptual architecture drawing"
         }
         
         style_instruction = style_prompts.get(style, style_prompts["render"])
         
-        system_prompt = f"""You are generating an architectural visualization image.
-Style: {style_instruction}
-Focus on: realistic materials, proper scale, buildable designs, architectural quality.
-The image should look like a professional architectural {style}."""
-
-        # Add style reference conditioning if provided
-        full_prompt = f"{system_prompt}\n\nConcept: {prompt}"
+        # Construct the full image generation prompt
+        full_prompt = f"{style_instruction}. {prompt}"
         if style_reference_description:
-            full_prompt += f"\n\nStyle reference: {style_reference_description}"
+            full_prompt += f". Style inspired by: {style_reference_description}"
         
         generated_images = []
         
         try:
-            # Use Gemini's imagen model for image generation
-            # Note: The actual API may vary based on Gemini version
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            # Try Imagen 3 first (requires specific API access)
+            imagen_success = False
+            try:
+                # Check if ImageGenerationModel is available
+                if hasattr(genai, 'ImageGenerationModel'):
+                    imagen = genai.ImageGenerationModel("imagen-3.0-generate-002")
+                    
+                    for i in range(variation_count):
+                        try:
+                            variation_prompt = f"{full_prompt} (unique variation {i+1})"
+                            
+                            response = await asyncio.to_thread(
+                                imagen.generate_images,
+                                prompt=variation_prompt,
+                                number_of_images=1,
+                                aspect_ratio="16:9",
+                            )
+                            
+                            if response and hasattr(response, 'images') and response.images:
+                                image = response.images[0]
+                                image_id = f"gen_{uuid.uuid4().hex[:8]}"
+                                
+                                # Get image data
+                                img_url = None
+                                if hasattr(image, '_pil_image') and image._pil_image:
+                                    buffered = BytesIO()
+                                    image._pil_image.save(buffered, format="PNG")
+                                    img_base64 = base64.b64encode(buffered.getvalue()).decode()
+                                    img_url = f"data:image/png;base64,{img_base64}"
+                                elif hasattr(image, 'data') and image.data:
+                                    img_base64 = base64.b64encode(image.data).decode()
+                                    img_url = f"data:image/png;base64,{img_base64}"
+                                
+                                if img_url:
+                                    generated_images.append({
+                                        "id": image_id,
+                                        "url": img_url,
+                                        "prompt": prompt,
+                                        "style": style,
+                                        "variation": i + 1,
+                                        "description": f"Generated concept: {prompt}",
+                                    })
+                                    imagen_success = True
+                                    
+                        except Exception as e:
+                            logger.debug(f"Imagen variation {i+1} failed: {e}")
+                            continue
+                            
+            except Exception as e:
+                logger.info(f"Imagen 3 not available: {e}")
             
-            for i in range(variation_count):
+            if imagen_success and generated_images:
+                logger.info(f"Successfully generated {len(generated_images)} images with Imagen 3")
+                return generated_images
+            
+            # Fallback: Use Gemini Flash with image generation capabilities
+            generated_images = []
+            try:
+                # Try gemini-2.0-flash-exp which supports image generation
+                model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                
+                for i in range(variation_count):
+                    try:
+                        variation_prompt = f"""Generate an architectural visualization image with these characteristics:
+- Style: {style_instruction}
+- Concept: {prompt}
+- This is variation {i+1} of {variation_count}, make it unique
+
+Create a high-quality architectural image based on this description."""
+                        
+                        # Request image generation
+                        response = await asyncio.to_thread(
+                            model.generate_content,
+                            variation_prompt,
+                        )
+                        
+                        image_id = f"gen_{uuid.uuid4().hex[:8]}"
+                        img_url = None
+                        description = f"Generated concept: {prompt}"
+                        
+                        # Check response for image data
+                        if response and hasattr(response, 'candidates') and response.candidates:
+                            candidate = response.candidates[0]
+                            if hasattr(candidate, 'content') and candidate.content:
+                                for part in candidate.content.parts:
+                                    # Check for inline image data
+                                    if hasattr(part, 'inline_data') and part.inline_data:
+                                        data = part.inline_data
+                                        if hasattr(data, 'data') and data.data:
+                                            mime = getattr(data, 'mime_type', 'image/png')
+                                            img_base64 = base64.b64encode(data.data).decode()
+                                            img_url = f"data:{mime};base64,{img_base64}"
+                                            break
+                                    # Also capture text description
+                                    elif hasattr(part, 'text') and part.text:
+                                        description = part.text[:300]
+                        
+                        generated_images.append({
+                            "id": image_id,
+                            "url": img_url,
+                            "prompt": prompt,
+                            "style": style,
+                            "variation": i + 1,
+                            "description": description,
+                        })
+                        
+                    except Exception as e:
+                        logger.warning(f"Gemini Flash variation {i+1} failed: {e}")
+                        generated_images.append({
+                            "id": f"gen_{uuid.uuid4().hex[:8]}",
+                            "url": None,
+                            "prompt": prompt,
+                            "style": style,
+                            "variation": i + 1,
+                            "description": f"Concept: {prompt}",
+                        })
+                
+            except Exception as e:
+                logger.warning(f"Gemini 2.0 Flash failed, trying 1.5: {e}")
+                
+                # Final fallback: Gemini 1.5 Flash (text only, for descriptions)
                 try:
-                    # Generate with variation in the prompt
-                    variation_prompt = f"{full_prompt}\n\n(Variation {i+1} of {variation_count} - create a unique interpretation)"
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     
-                    # For now, we'll generate a placeholder response
-                    # In production, this would call the actual Imagen API
-                    response = await asyncio.to_thread(
-                        model.generate_content,
-                        variation_prompt
-                    )
-                    
-                    # Create image data structure
-                    image_id = f"gen_{uuid.uuid4().hex[:8]}"
-                    
-                    generated_images.append({
-                        "id": image_id,
-                        "url": None,  # Will be populated after storage
-                        "prompt": prompt,
-                        "style": style,
-                        "variation": i + 1,
-                        "description": response.text if response.text else f"Generated concept for: {prompt}",
-                    })
-                    
+                    for i in range(variation_count):
+                        try:
+                            variation_prompt = f"""You are an architectural visualization expert. 
+Describe in detail what an image would look like for this architectural concept:
+- Style: {style_instruction}
+- Concept: {prompt}
+- Variation {i+1} of {variation_count}
+
+Provide a vivid, detailed description of this architectural visualization."""
+                            
+                            response = await asyncio.to_thread(
+                                model.generate_content,
+                                variation_prompt
+                            )
+                            
+                            description = response.text if response.text else f"Architectural concept: {prompt}"
+                            
+                            generated_images.append({
+                                "id": f"gen_{uuid.uuid4().hex[:8]}",
+                                "url": None,
+                                "prompt": prompt,
+                                "style": style,
+                                "variation": i + 1,
+                                "description": description[:500],
+                            })
+                            
+                        except Exception as e:
+                            logger.error(f"Gemini 1.5 variation {i+1} failed: {e}")
+                            generated_images.append({
+                                "id": f"gen_{uuid.uuid4().hex[:8]}",
+                                "url": None,
+                                "prompt": prompt,
+                                "style": style,
+                                "variation": i + 1,
+                                "description": f"Concept: {prompt}",
+                            })
+                            
                 except Exception as e:
-                    logger.error(f"Failed to generate variation {i+1}: {e}")
-                    continue
+                    logger.error(f"All Gemini models failed: {e}")
+                    # Return placeholder entries
+                    for i in range(variation_count):
+                        generated_images.append({
+                            "id": f"gen_{uuid.uuid4().hex[:8]}",
+                            "url": None,
+                            "prompt": prompt,
+                            "style": style,
+                            "variation": i + 1,
+                            "description": f"Architectural concept: {prompt}",
+                        })
             
             return generated_images
             

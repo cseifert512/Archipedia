@@ -48,14 +48,15 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
     }
   }, [id, updateNode]);
 
-  // Execution status
+  // Execution status - check all possible status fields
   const status = data.status || (data as any).executionStatus;
   const isGenerating = status === 'generating' || status === 'running';
+  const isComplete = status === 'complete' || status === 'success';
   const error = data.error || (data as any).executionError;
   
   // Get generated images from executionResult or direct data
   const executionResult = (data as any).executionResult;
-  const generatedImages = executionResult?.images || data.generatedImages || [];
+  const generatedImages: GeneratedImageData[] = executionResult?.images || data.generatedImages || [];
   const selectedIndex = data.selectedImageIndex || 0;
 
   // Calculate positions for connection handles
@@ -74,12 +75,12 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
       style={{
         width: '320px',
         minHeight: '340px',
-        backgroundColor: '#FFFFFF',
-        border: selected ? '2px solid #9D7BE8' : '1px solid rgba(0,0,0,0.1)',
+        backgroundColor: '#9D7BE8',
+        border: selected ? '2px solid #7B5FC7' : '1px solid rgba(157,123,232,0.5)',
         borderRadius: '12px',
         boxShadow: selected
-          ? '0 0 0 2px #9D7BE8, 0 8px 32px rgba(0,0,0,0.2)'
-          : '0 4px 20px rgba(0,0,0,0.1)',
+          ? '0 0 0 2px #7B5FC7, 0 8px 32px rgba(157,123,232,0.4)'
+          : '0 4px 20px rgba(157,123,232,0.25)',
         display: 'flex',
         flexDirection: 'column',
         zIndex: selected ? 50 : 10,
@@ -174,8 +175,8 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
       <div
         style={{
           padding: '12px 16px',
-          borderBottom: '1px solid rgba(0,0,0,0.1)',
-          backgroundColor: '#9D7BE8',
+          borderBottom: '1px solid rgba(255,255,255,0.2)',
+          backgroundColor: 'rgba(0,0,0,0.1)',
           borderTopLeftRadius: '12px',
           borderTopRightRadius: '12px',
           display: 'flex',
@@ -287,6 +288,9 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
           flexDirection: 'column',
           gap: '12px',
           minHeight: 0,
+          backgroundColor: 'rgba(255,255,255,0.95)',
+          borderBottomLeftRadius: '12px',
+          borderBottomRightRadius: '12px',
         }}
       >
         {/* Prompt Input */}
@@ -295,8 +299,8 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
             style={{
               fontFamily: 'var(--font-primary)',
               fontSize: '10px',
-              fontWeight: 400,
-              color: '#000000',
+              fontWeight: 500,
+              color: '#9D7BE8',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               marginBottom: '6px',
@@ -319,22 +323,23 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
             style={{
               width: '100%',
               padding: '10px',
-              border: '1px solid #e0e0e0',
+              border: '2px solid rgba(157,123,232,0.3)',
               borderRadius: '6px',
               fontSize: '11px',
               fontFamily: 'Monaco, monospace',
               resize: 'none',
               height: '70px',
-              background: '#fafafa',
+              background: 'rgba(157,123,232,0.05)',
               outline: 'none',
+              color: '#333',
             }}
             onFocus={(e) => {
               e.target.style.borderColor = '#9D7BE8';
               e.target.style.background = 'white';
             }}
             onBlur={(e) => {
-              e.target.style.borderColor = '#e0e0e0';
-              e.target.style.background = '#fafafa';
+              e.target.style.borderColor = 'rgba(157,123,232,0.3)';
+              e.target.style.background = 'rgba(157,123,232,0.05)';
             }}
           />
         </div>
@@ -360,8 +365,9 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
                 border: 'none',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
-                background: style === value ? '#9D7BE8' : '#f0f0f0',
-                color: style === value ? '#FFFFFF' : '#666666',
+                background: style === value ? '#9D7BE8' : 'rgba(157,123,232,0.15)',
+                color: style === value ? '#FFFFFF' : '#7B5FC7',
+                fontWeight: style === value ? 600 : 400,
               }}
             >
               {label}
@@ -385,10 +391,11 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
               fontSize: '10px',
               fontFamily: 'var(--font-primary)',
               borderRadius: '6px',
-              border: '1px solid #e0e0e0',
-              background: '#fafafa',
+              border: '2px solid rgba(157,123,232,0.3)',
+              background: 'rgba(157,123,232,0.05)',
               cursor: 'pointer',
               marginLeft: 'auto',
+              color: '#7B5FC7',
             }}
           >
             <option value={1}>1 variation</option>
@@ -416,14 +423,15 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
                 onMouseDown={(e) => e.stopPropagation()}
                 style={{
                   position: 'relative',
-                  aspectRatio: '1',
+                  aspectRatio: img.url ? '1' : 'auto',
+                  minHeight: img.url ? 'auto' : '60px',
                   borderRadius: '8px',
                   overflow: 'hidden',
-                  border: selectedIndex === idx ? '2px solid #9D7BE8' : '2px solid transparent',
+                  border: selectedIndex === idx ? '2px solid #9D7BE8' : '2px solid rgba(157,123,232,0.2)',
                   boxShadow: selectedIndex === idx ? '0 0 0 2px rgba(157, 123, 232, 0.3)' : 'none',
                   cursor: 'pointer',
                   padding: 0,
-                  background: '#f0f0f0',
+                  background: img.url ? '#f0f0f0' : 'linear-gradient(135deg, rgba(157,123,232,0.1), rgba(157,123,232,0.05))',
                 }}
               >
                 {img.url ? (
@@ -442,12 +450,28 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
                       width: '100%',
                       height: '100%',
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      background: 'linear-gradient(135deg, #f0f0f0, #e0e0e0)',
+                      padding: '8px',
+                      gap: '4px',
                     }}
                   >
-                    <Sparkles size={20} color="#9D7BE8" />
+                    <Sparkles size={16} color="#9D7BE8" />
+                    {img.description && (
+                      <span
+                        style={{
+                          fontSize: '8px',
+                          color: '#7B5FC7',
+                          textAlign: 'center',
+                          lineHeight: 1.2,
+                          maxHeight: '32px',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {img.description.slice(0, 60)}...
+                      </span>
+                    )}
                   </div>
                 )}
                 {selectedIndex === idx && (
@@ -477,13 +501,13 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
         {status === 'error' && error && (
           <div
             style={{
-              padding: '8px',
+              padding: '10px',
               borderRadius: '6px',
-              border: '1px solid rgba(255,0,0,0.25)',
-              backgroundColor: 'rgba(255,0,0,0.06)',
+              border: '2px solid rgba(220,53,69,0.3)',
+              backgroundColor: 'rgba(220,53,69,0.08)',
               fontFamily: 'var(--font-primary)',
               fontSize: '10px',
-              color: 'rgba(0,0,0,0.8)',
+              color: '#721c24',
               lineHeight: 1.35,
             }}
           >
@@ -493,20 +517,21 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
         )}
 
         {/* Success Summary */}
-        {status === 'complete' && generatedImages.length > 0 && (
+        {isComplete && generatedImages.length > 0 && (
           <div
             style={{
-              padding: '8px',
+              padding: '10px',
               borderRadius: '6px',
-              border: '1px solid rgba(0,0,0,0.08)',
-              backgroundColor: 'rgba(157, 123, 232, 0.08)',
+              border: '2px solid rgba(157,123,232,0.3)',
+              backgroundColor: 'rgba(157,123,232,0.1)',
               fontFamily: 'var(--font-primary)',
               fontSize: '10px',
-              color: 'rgba(0,0,0,0.75)',
+              color: '#7B5FC7',
               textAlign: 'center',
+              fontWeight: 500,
             }}
           >
-            Generated {generatedImages.length} concept{generatedImages.length > 1 ? 's' : ''} • Select one to use
+            ✨ Generated {generatedImages.length} concept{generatedImages.length > 1 ? 's' : ''} • Select one to use
           </div>
         )}
       </section>
