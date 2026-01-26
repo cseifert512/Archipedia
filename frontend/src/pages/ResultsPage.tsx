@@ -19,7 +19,10 @@ import {
   createResultsNode,
   createOperatorANDNode, 
   createOperatorORNode, 
-  createOperatorNOTNode 
+  createOperatorNOTNode,
+  createGenerateNode,
+  createValidateNode,
+  createStyleReferenceNode
 } from "../lib/nodeFactory";
 
 export function ResultsPage() {
@@ -320,6 +323,15 @@ export function ResultsPage() {
         break;
       case 'operatorNOT':
         newNode = createOperatorNOTNode(position);
+        break;
+      case 'generate':
+        newNode = createGenerateNode(position);
+        break;
+      case 'validate':
+        newNode = createValidateNode(position);
+        break;
+      case 'styleReference':
+        newNode = createStyleReferenceNode(position);
         break;
       default:
         console.warn(`Unknown node type: ${type}, defaulting to text node`);

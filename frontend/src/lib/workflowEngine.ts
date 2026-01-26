@@ -4,6 +4,8 @@ import { cacheManager } from './CacheManager';
 import { searchByImageFile, searchByText, toAbsoluteUrl } from './navigatorApi';
 import { PrecedentProject } from '../types/nodes';
 import { generateConcept, validateConceptFile, extractStyle } from './generateApi';
+import { createImageNode } from './nodeFactory';
+import { useCanvasStore } from '../stores/canvasStore';
 
 /**
  * Workflow Execution Engine
@@ -639,6 +641,7 @@ async function executeResultsNode(
 
 /**
  * Execute generate node - creates AI concept images
+ * After successful generation, auto-spawns a blue ImageNode with the generated image
  */
 async function executeGenerateNode(
   node: Node<NodeData>,
@@ -670,6 +673,36 @@ async function executeGenerateNode(
       variations: variationCount,
       styleReferenceDescription,
     });
+
+    // Auto-spawn a blue ImageNode with the first generated image
+    const firstImage = response.images[0];
+    if (firstImage && firstImage.url) {
+      // Position the ImageNode to the right of the GenerateNode
+      const imageNodePosition = {
+        x: node.position.x + 400,
+        y: node.position.y,
+      };
+      
+      const imageNode = createImageNode(imageNodePosition, firstImage.url);
+      
+      // Add the ImageNode to the canvas
+      const { addNodes, addEdges } = useCanvasStore.getState();
+      addNodes([imageNode]);
+      
+      // Create an edge connecting the GenerateNode output to the ImageNode input
+      const edge = {
+        id: `edge-${node.id}-${imageNode.id}`,
+        source: node.id,
+        sourceHandle: 'image-output',
+        target: imageNode.id,
+        targetHandle: 'input',
+      };
+      
+      // Add the edge after a brief delay to ensure the node is added
+      setTimeout(() => {
+        addEdges([edge]);
+      }, 50);
+    }
 
     return {
       outputs: {
