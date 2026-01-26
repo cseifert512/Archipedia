@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, env="OPENAI_API_KEY")
     openai_embedding_model: str = Field(default="text-embedding-3-small", env="OPENAI_EMBEDDING_MODEL")
     
+    # Gemini settings (for generation)
+    gemini_api_key: str | None = Field(default=None, env="GEMINI_API_KEY")
+    
     # Cloudflare R2 settings (for image hosting)
     r2_account_id: str | None = Field(default=None, env="R2_ACCOUNT_ID")
     r2_access_key_id: str | None = Field(default=None, env="R2_ACCESS_KEY_ID")
@@ -45,6 +48,11 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=10, env="MAX_UPLOAD_MB")
     allow_pdf: bool = Field(default=True, env="ALLOW_PDF")
     upload_tmp_dir: str = Field(default="/tmp", env="UPLOAD_TMP_DIR")
+    
+    # Clerk authentication settings
+    # Get from Clerk Dashboard: https://dashboard.clerk.com
+    clerk_frontend_api: str | None = Field(default=None, env="CLERK_FRONTEND_API")
+    clerk_secret_key: str | None = Field(default=None, env="CLERK_SECRET_KEY")
     
     class Config:
         env_file = ".env"

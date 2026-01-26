@@ -21,6 +21,8 @@ from app.models import Feedback, Weights
 from app.config import settings
 from app.services.text_embedder import get_text_index, embed_text
 from app.routers import boards as boards_router
+from app.routers import generate as generate_router
+from app.routers import auth as auth_router
 
 # Spatial feature computation imports
 try:
@@ -40,6 +42,8 @@ logger = logging.getLogger("navigator")
 
 # Include routers
 app.include_router(boards_router.router, tags=["boards"])
+app.include_router(generate_router.router)
+app.include_router(auth_router.router)
 
 # ---- debug-mode logger (writes NDJSON to the session log file) ----
 def _agent_debug_log(hypothesis_id: str, location: str, message: str, data: dict, run_id: str = "pre-fix"):

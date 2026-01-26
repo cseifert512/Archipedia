@@ -24,6 +24,9 @@ export function createNode(
     type === 'operatorNOT' ? 'operatorNOT' :
     type === 'results' ? 'results' :
     type === 'text' ? 'text' :
+    type === 'generate' ? 'generate' :
+    type === 'validate' ? 'validate' :
+    type === 'styleReference' ? 'styleReference' :
     'default';
 
   return {
@@ -145,6 +148,46 @@ export function createResultsNode(
     type: 'results',
     resultCount,
     results: [],
+  });
+}
+
+export function createGenerateNode(
+  position: { x: number; y: number },
+  prompt: string = ''
+): Node<NodeData> {
+  return createNode('generate', position, {
+    type: 'generate',
+    prompt,
+    style: 'render',
+    variationCount: 4,
+    generatedImages: [],
+    selectedImageIndex: 0,
+    status: 'idle',
+  });
+}
+
+export function createValidateNode(
+  position: { x: number; y: number }
+): Node<NodeData> {
+  return createNode('validate', position, {
+    type: 'validate',
+    topK: 5,
+    minSimilarity: 0.5,
+    validatedProjects: [],
+    validationScore: 0,
+    status: 'idle',
+  });
+}
+
+export function createStyleReferenceNode(
+  position: { x: number; y: number }
+): Node<NodeData> {
+  return createNode('styleReference', position, {
+    type: 'styleReference',
+    extractMaterials: true,
+    extractPalette: true,
+    extractMassing: false,
+    status: 'idle',
   });
 }
 

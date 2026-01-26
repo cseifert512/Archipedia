@@ -14,6 +14,8 @@ import {
 } from '../components/ClassicSearch';
 import { HamburgerMenu } from '../components/HamburgerMenu';
 import { useBoardStore } from '../stores/boardStore';
+import { useSelectionStore } from '../stores/selectionStore';
+import { SelectionToolbar, SearchExportDialog } from '../components/Export';
 import { mockProjects } from '../lib/mockData';
 import { toast } from 'sonner';
 import { searchByText, searchByImageFile, searchHybrid, searchByMultipleImages, searchByImageId, toAbsoluteUrl, SearchError } from '../lib/navigatorApi';
@@ -74,6 +76,10 @@ export function ClassicSearchPage() {
   // Board state
   const { isDrawerOpen, openDrawer, closeDrawer, saveToActiveBoard, boards, activeBoardId } =
     useBoardStore();
+
+  // Selection state for export
+  const { clearSelection, selectRange, getSelectedArray, getSelectedCount } = useSelectionStore();
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Active filter chips
   const activeFilterChips = useMemo(() => {
@@ -511,7 +517,23 @@ export function ClassicSearchPage() {
     setCurrentPage(1);
     setHasMore(false);
     setTotalCount(0);
+    clearSelection(); // Clear selection when starting new search
   };
+
+  // Handle shift-click range selection
+  const handleShiftSelect = useCallback((fromIndex: number, toIndex: number) => {
+    selectRange(sortedResults, fromIndex, toIndex);
+  }, [sortedResults, selectRange]);
+
+  // Handle export dialog
+  const handleOpenExport = useCallback(() => {
+    const selectedCount = getSelectedCount();
+    if (selectedCount === 0) {
+      toast.error('Select at least one project to export');
+      return;
+    }
+    setShowExportDialog(true);
+  }, [getSelectedCount]);
 
   const handleClearFilters = () => {
     setFilters(EMPTY_FILTERS);
@@ -997,14 +1019,17 @@ export function ClassicSearchPage() {
                   gap: '20px',
                 }}
               >
-                {sortedResults.map((result) => (
+                {sortedResults.map((result, index) => (
                   <SearchResultCard
                     key={result.project_id}
                     result={result}
+                    index={index}
                     onOpen={handleOpenResult}
                     onSave={handleSaveResult}
                     onSearchLikeThis={handleSearchLikeThis}
+                    onShiftSelect={handleShiftSelect}
                     isSaved={isItemSaved(result.project_id)}
+                    enableSelection={true}
                   />
                 ))}
                 
@@ -1177,6 +1202,20 @@ export function ClassicSearchPage() {
 
       {/* Board Drawer */}
       <BoardDrawer isOpen={isDrawerOpen} onClose={closeDrawer} />
+
+      {/* Selection Toolbar */}
+      <SelectionToolbar 
+        allResults={sortedResults} 
+        onExport={handleOpenExport} 
+      />
+
+      {/* Export Dialog */}
+      {showExportDialog && (
+        <SearchExportDialog
+          projects={getSelectedArray()}
+          onClose={() => setShowExportDialog(false)}
+        />
+      )}
 
       {/* CSS for skeleton animation */}
       <style>{`

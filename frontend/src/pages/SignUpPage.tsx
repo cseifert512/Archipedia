@@ -1,10 +1,10 @@
 import React from 'react';
 import { useLocation } from 'wouter';
-import { SignIn } from '@clerk/clerk-react';
+import { SignUp } from '@clerk/clerk-react';
 import { ArrowLeft } from 'lucide-react';
 import { isAuthEnabled } from '../lib/auth';
 
-export function SignInPage() {
+export function SignUpPage() {
   const [, setLocation] = useLocation();
 
   // If Clerk is not configured, show a placeholder
@@ -114,7 +114,7 @@ export function SignInPage() {
                   marginBottom: '24px',
                 }}
               >
-                Set <code style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '4px' }}>VITE_CLERK_PUBLISHABLE_KEY</code> in your environment to enable sign-in.
+                Set <code style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '4px' }}>VITE_CLERK_PUBLISHABLE_KEY</code> in your environment to enable sign-up.
               </p>
               <button
                 onClick={() => setLocation('/')}
@@ -213,11 +213,11 @@ export function SignInPage() {
           padding: '40px 24px',
         }}
       >
-        <SignIn 
+        <SignUp 
           routing="path" 
-          path="/signin"
-          signUpUrl="/signup"
-          afterSignInUrl="/"
+          path="/signup"
+          signInUrl="/signin"
+          afterSignUpUrl="/"
           appearance={{
             elements: {
               rootBox: {
@@ -256,3 +256,4 @@ export function SignInPage() {
     </div>
   );
 }
+

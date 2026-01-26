@@ -3,6 +3,7 @@ import { NodeData } from '../types/nodes';
 import { cacheManager } from './CacheManager';
 import { searchByImageFile, searchByText, toAbsoluteUrl } from './navigatorApi';
 import { PrecedentProject } from '../types/nodes';
+import { generateConcept, validateConceptFile, extractStyle } from './generateApi';
 
 /**
  * Workflow Execution Engine
@@ -179,6 +180,15 @@ export async function executeNode(
 
       case 'results':
         return executeResultsNode(node, context);
+
+      case 'generate':
+        return executeGenerateNode(node, context);
+
+      case 'validate':
+        return executeValidateNode(node, context);
+
+      case 'styleReference':
+        return executeStyleReferenceNode(node, context);
 
       default:
         return {
@@ -625,6 +635,189 @@ async function executeResultsNode(
     },
     status: 'success',
   };
+}
+
+/**
+ * Execute generate node - creates AI concept images
+ */
+async function executeGenerateNode(
+  node: Node<NodeData>,
+  context: NodeExecutionContext
+): Promise<NodeExecutionResult> {
+  const data = node.data as any;
+  const prompt = data.prompt || '';
+  const style = data.style || 'render';
+  const variationCount = data.variationCount || 4;
+  
+  // Get style reference from input if connected
+  let styleReferenceDescription = data.styleReferenceDescription;
+  if (context.inputs['style-input'] && typeof context.inputs['style-input'] === 'object') {
+    styleReferenceDescription = context.inputs['style-input'].styleDescription || styleReferenceDescription;
+  }
+
+  if (!prompt.trim()) {
+    return {
+      outputs: {},
+      status: 'error',
+      error: 'Please enter a prompt to generate concepts.',
+    };
+  }
+
+  try {
+    const response = await generateConcept({
+      prompt,
+      style,
+      variations: variationCount,
+      styleReferenceDescription,
+    });
+
+    return {
+      outputs: {
+        output: response.images,
+        images: response.images,
+        selectedImage: response.images[0],
+        searchReady: response.search_ready,
+      },
+      status: 'success',
+    };
+  } catch (error) {
+    return {
+      outputs: {},
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Generation failed',
+    };
+  }
+}
+
+/**
+ * Execute validate node - finds real projects similar to input
+ */
+async function executeValidateNode(
+  node: Node<NodeData>,
+  context: NodeExecutionContext
+): Promise<NodeExecutionResult> {
+  const data = node.data as any;
+  const topK = data.topK || 5;
+  const minSimilarity = data.minSimilarity || 0.5;
+  
+  // Get image from input connection
+  let imageUrl = data.inputImageUrl;
+  let imageFile: File | undefined;
+  
+  // Check for image from connected generate node or image node
+  const imageInput = context.inputs['image-input'] || context.inputs.input;
+  if (imageInput) {
+    if (typeof imageInput === 'string') {
+      imageUrl = imageInput;
+    } else if (imageInput.selectedImage?.url) {
+      imageUrl = imageInput.selectedImage.url;
+    } else if (imageInput.images?.[0]?.url) {
+      imageUrl = imageInput.images[0].url;
+    } else if (imageInput.imageUrl) {
+      imageUrl = imageInput.imageUrl;
+    } else if (imageInput instanceof File) {
+      imageFile = imageInput;
+    }
+  }
+
+  if (!imageUrl && !imageFile) {
+    return {
+      outputs: {},
+      status: 'error',
+      error: 'Connect an image input to validate against real projects.',
+    };
+  }
+
+  try {
+    // For file-based validation, we need to create a File from a data URL
+    if (imageUrl && imageUrl.startsWith('data:')) {
+      const blob = await fetch(imageUrl).then(r => r.blob());
+      imageFile = new File([blob], 'concept.png', { type: blob.type || 'image/png' });
+    }
+
+    if (imageFile) {
+      const response = await validateConceptFile(imageFile, topK, minSimilarity);
+      
+      return {
+        outputs: {
+          output: response.similar_projects,
+          validatedProjects: response.similar_projects,
+          validationScore: response.validation_score,
+          projects: response.similar_projects.map(p => ({
+            id: p.project_id,
+            title: p.title || p.project_id,
+            thumbnail: p.thumb_url || '',
+            attributes: {
+              typology: p.typology,
+              country: p.country,
+            },
+          })),
+        },
+        status: 'success',
+      };
+    }
+
+    // URL-based validation would need a different endpoint
+    return {
+      outputs: {},
+      status: 'error',
+      error: 'Image validation requires a file upload. Connect an image node.',
+    };
+  } catch (error) {
+    return {
+      outputs: {},
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Validation failed',
+    };
+  }
+}
+
+/**
+ * Execute style reference node - extracts style description from image
+ */
+async function executeStyleReferenceNode(
+  node: Node<NodeData>,
+  context: NodeExecutionContext
+): Promise<NodeExecutionResult> {
+  const data = node.data as any;
+  const imageUrl = data.imageUrl;
+
+  if (!imageUrl) {
+    return {
+      outputs: {},
+      status: 'error',
+      error: 'Upload a reference image to extract style.',
+    };
+  }
+
+  try {
+    const response = await extractStyle(imageUrl);
+
+    if (!response.success) {
+      return {
+        outputs: {},
+        status: 'error',
+        error: 'Failed to extract style from image.',
+      };
+    }
+
+    return {
+      outputs: {
+        output: response.description,
+        styleDescription: response.description,
+        materials: response.materials,
+        palette: response.palette,
+        massingDescription: response.massing_description,
+      },
+      status: 'success',
+    };
+  } catch (error) {
+    return {
+      outputs: {},
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Style extraction failed',
+    };
+  }
 }
 
 /**

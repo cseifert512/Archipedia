@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Type, ImageIcon, Grid3X3, Settings, Search, Filter, Ruler, Circle, GitMerge, Minus, FolderOpen, Plus, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Type, ImageIcon, Grid3X3, Settings, Search, Filter, Ruler, Circle, GitMerge, Minus, FolderOpen, Plus, ChevronDown, ChevronUp, Trash2, Sparkles, CheckCircle, Palette } from 'lucide-react';
 import { Node, Edge } from 'reactflow';
 import { NodeData } from '../../types/nodes';
 
@@ -11,14 +11,21 @@ interface NodeType {
 }
 
 const nodeTypes: NodeType[] = [
+  // Input nodes
   { icon: Type, label: 'Text', type: 'text', color: '#F5F1E8' },
   { icon: ImageIcon, label: 'Image', type: 'image', color: '#64B5FF' },
+  // Generation nodes
+  { icon: Sparkles, label: 'Generate', type: 'generate', color: '#9D7BE8' },
+  { icon: Palette, label: 'Style Ref', type: 'styleReference', color: '#FFA500' },
+  { icon: CheckCircle, label: 'Validate', type: 'validate', color: '#4CAF50' },
+  // Filter & operators
   { icon: Filter, label: 'Attributes', type: 'attributeFilter', color: '#90EE90' },
   { icon: Ruler, label: 'Constraints', type: 'scalar', color: '#4A90E2' },
-  { icon: Grid3X3, label: 'Results', type: 'results', color: '#7B68EE' },
   { icon: Circle, label: 'AND', type: 'operatorAND', color: '#FF9F43' },
-  { icon: GitMerge, label: 'OR', type: 'operatorOR', color: '#9D7BE8' },
+  { icon: GitMerge, label: 'OR', type: 'operatorOR', color: '#C8A2C8' },
   { icon: Minus, label: 'NOT', type: 'operatorNOT', color: '#FF6B6B' },
+  // Output
+  { icon: Grid3X3, label: 'Results', type: 'results', color: '#7B68EE' },
 ];
 
 interface WorkflowTemplate {

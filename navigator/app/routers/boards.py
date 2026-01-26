@@ -17,6 +17,7 @@ import asyncio
 
 from ..config import settings
 from ..services.export_service import generate_pdf, EXPORT_DIR, PLAYWRIGHT_AVAILABLE
+from ..auth import ClerkUser, get_optional_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -51,6 +52,8 @@ def init_db():
             layout_mode TEXT DEFAULT 'grid',
             page_format TEXT DEFAULT 'web',
             share_token TEXT UNIQUE NOT NULL,
+            user_id TEXT,
+            is_public BOOLEAN DEFAULT FALSE,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -88,6 +91,18 @@ def init_db():
     # Add layout_mode column if it doesn't exist (migration for existing DBs)
     try:
         cursor.execute("ALTER TABLE boards ADD COLUMN layout_mode TEXT DEFAULT 'grid'")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    # Add user_id column if it doesn't exist (migration for auth)
+    try:
+        cursor.execute("ALTER TABLE boards ADD COLUMN user_id TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    # Add is_public column if it doesn't exist
+    try:
+        cursor.execute("ALTER TABLE boards ADD COLUMN is_public BOOLEAN DEFAULT FALSE")
     except sqlite3.OperationalError:
         pass  # Column already exists
 
@@ -177,6 +192,9 @@ class BoardResponse(BaseModel):
     layout_mode: str = "grid"
     page_format: str
     share_token: str
+    user_id: Optional[str] = None
+    is_public: bool = False
+    is_owner: bool = False  # Computed field for frontend
     blocks: List[Dict[str, Any]]
     created_at: str
     updated_at: str
@@ -258,8 +276,12 @@ def create_default_canvas_doc() -> Dict[str, Any]:
     }
 
 
-def board_row_to_dict(row: sqlite3.Row, blocks: List[Dict]) -> Dict:
+def board_row_to_dict(row: sqlite3.Row, blocks: List[Dict], current_user_id: Optional[str] = None) -> Dict:
     """Convert database row to response dict."""
+    user_id = row["user_id"] if "user_id" in row.keys() else None
+    is_public = row["is_public"] if "is_public" in row.keys() else False
+    is_owner = current_user_id is not None and user_id == current_user_id
+    
     return {
         "id": row["id"],
         "title": row["title"],
@@ -270,6 +292,9 @@ def board_row_to_dict(row: sqlite3.Row, blocks: List[Dict]) -> Dict:
         "layout_mode": row["layout_mode"] if "layout_mode" in row.keys() else "grid",
         "page_format": row["page_format"],
         "share_token": row["share_token"],
+        "user_id": user_id,
+        "is_public": bool(is_public),
+        "is_owner": is_owner,
         "blocks": blocks,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
@@ -289,8 +314,11 @@ def block_row_to_dict(row: sqlite3.Row) -> Dict:
 # ============ API Endpoints ============
 
 @router.post("/boards", response_model=BoardResponse)
-async def create_board(body: BoardCreate):
-    """Create a new board."""
+async def create_board(
+    body: BoardCreate,
+    user: Optional[ClerkUser] = Depends(get_optional_user)
+):
+    """Create a new board. If authenticated, board is owned by the user."""
     conn = get_db()
     cursor = conn.cursor()
 
@@ -299,10 +327,11 @@ async def create_board(body: BoardCreate):
         share_token = generate_share_token()
         now = now_iso()
         layout_mode = body.layout_mode or "grid"
+        user_id = user.user_id if user else None
 
         cursor.execute("""
-            INSERT INTO boards (id, title, subtitle, description, layout_preset, layout_mode, page_format, share_token, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO boards (id, title, subtitle, description, layout_preset, layout_mode, page_format, share_token, user_id, is_public, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             board_id,
             body.title,
@@ -312,6 +341,8 @@ async def create_board(body: BoardCreate):
             layout_mode,
             body.page_format,
             share_token,
+            user_id,
+            False,  # is_public defaults to False
             now,
             now,
         ))
@@ -336,6 +367,9 @@ async def create_board(body: BoardCreate):
             layout_mode=layout_mode,
             page_format=body.page_format or "web",
             share_token=share_token,
+            user_id=user_id,
+            is_public=False,
+            is_owner=user_id is not None,
             blocks=[],
             created_at=now,
             updated_at=now,
@@ -350,8 +384,12 @@ async def create_board(body: BoardCreate):
 
 
 @router.get("/boards/{board_id}", response_model=BoardResponse)
-async def get_board(board_id: str, token: Optional[str] = Query(None)):
-    """Get a board by ID. Requires token for unlisted boards."""
+async def get_board(
+    board_id: str, 
+    token: Optional[str] = Query(None),
+    user: Optional[ClerkUser] = Depends(get_optional_user)
+):
+    """Get a board by ID. Returns ownership info based on current user."""
     conn = get_db()
     cursor = conn.cursor()
 
@@ -369,7 +407,8 @@ async def get_board(board_id: str, token: Optional[str] = Query(None)):
         block_rows = cursor.fetchall()
         blocks = [block_row_to_dict(r) for r in block_rows]
 
-        return BoardResponse(**board_row_to_dict(row, blocks))
+        current_user_id = user.user_id if user else None
+        return BoardResponse(**board_row_to_dict(row, blocks, current_user_id))
 
     finally:
         conn.close()
@@ -665,20 +704,41 @@ async def get_board_by_token(share_token: str):
 # ============ List Boards Endpoint ============
 
 @router.get("/boards", response_model=List[BoardListItem])
-async def list_boards(limit: int = 50, offset: int = 0):
-    """List all boards."""
+async def list_boards(
+    limit: int = 50, 
+    offset: int = 0,
+    user: Optional[ClerkUser] = Depends(get_optional_user)
+):
+    """
+    List boards. If authenticated, returns user's boards.
+    If not authenticated, returns public boards only.
+    """
     conn = get_db()
     cursor = conn.cursor()
 
     try:
-        cursor.execute("""
-            SELECT b.*, COUNT(bl.id) as block_count
-            FROM boards b
-            LEFT JOIN blocks bl ON b.id = bl.board_id
-            GROUP BY b.id
-            ORDER BY b.updated_at DESC
-            LIMIT ? OFFSET ?
-        """, (limit, offset))
+        if user:
+            # Authenticated: return user's boards
+            cursor.execute("""
+                SELECT b.*, COUNT(bl.id) as block_count
+                FROM boards b
+                LEFT JOIN blocks bl ON b.id = bl.board_id
+                WHERE b.user_id = ?
+                GROUP BY b.id
+                ORDER BY b.updated_at DESC
+                LIMIT ? OFFSET ?
+            """, (user.user_id, limit, offset))
+        else:
+            # Not authenticated: return public boards only
+            cursor.execute("""
+                SELECT b.*, COUNT(bl.id) as block_count
+                FROM boards b
+                LEFT JOIN blocks bl ON b.id = bl.board_id
+                WHERE b.is_public = TRUE
+                GROUP BY b.id
+                ORDER BY b.updated_at DESC
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
 
         boards = []
         for row in cursor.fetchall():
@@ -694,6 +754,77 @@ async def list_boards(limit: int = 50, offset: int = 0):
 
         return boards
 
+    finally:
+        conn.close()
+
+
+# ============ Claim Boards Endpoint ============
+
+class ClaimBoardsRequest(BaseModel):
+    board_ids: List[str]
+
+
+class ClaimBoardsResponse(BaseModel):
+    claimed: int
+    already_owned: int
+    not_found: int
+
+
+@router.post("/boards/claim", response_model=ClaimBoardsResponse)
+async def claim_boards(
+    body: ClaimBoardsRequest,
+    user: ClerkUser = Depends(get_optional_user)
+):
+    """
+    Claim anonymous boards (boards without a user_id) for the authenticated user.
+    Used when a user signs in and wants to claim boards they created while anonymous.
+    """
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required to claim boards")
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    claimed = 0
+    already_owned = 0
+    not_found = 0
+    
+    try:
+        for board_id in body.board_ids:
+            cursor.execute("SELECT user_id FROM boards WHERE id = ?", (board_id,))
+            row = cursor.fetchone()
+            
+            if not row:
+                not_found += 1
+                continue
+            
+            current_owner = row["user_id"]
+            
+            if current_owner == user.user_id:
+                already_owned += 1
+            elif current_owner is None:
+                # Board is unclaimed, claim it
+                cursor.execute(
+                    "UPDATE boards SET user_id = ?, updated_at = ? WHERE id = ?",
+                    (user.user_id, now_iso(), board_id)
+                )
+                claimed += 1
+            else:
+                # Board belongs to someone else, can't claim
+                pass
+        
+        conn.commit()
+        
+        return ClaimBoardsResponse(
+            claimed=claimed,
+            already_owned=already_owned,
+            not_found=not_found
+        )
+    
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Failed to claim boards: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 

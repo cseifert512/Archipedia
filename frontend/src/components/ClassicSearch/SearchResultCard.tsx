@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
-import { Bookmark, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bookmark, Search, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { MatchReasonBadge } from './MatchReasonBadge';
+import { useSelectionStore } from '../../stores/selectionStore';
 
 export interface ProjectImage {
   image_id: string;
@@ -30,22 +31,50 @@ export interface SearchResultData {
 
 interface SearchResultCardProps {
   result: SearchResultData;
+  index?: number; // Index in results array for shift-click range selection
   onOpen: (result: SearchResultData, currentImageIndex?: number) => void;
   onSave: (result: SearchResultData, currentImage?: ProjectImage) => void;
   onSearchLikeThis: (result: SearchResultData, currentImage?: ProjectImage) => void;
+  onShiftSelect?: (fromIndex: number, toIndex: number) => void;
   isSaved?: boolean;
+  enableSelection?: boolean;
 }
 
 export function SearchResultCard({
   result,
+  index = 0,
   onOpen,
   onSave,
   onSearchLikeThis,
+  onShiftSelect,
   isSaved = false,
+  enableSelection = true,
 }: SearchResultCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  // Selection state
+  const { 
+    isSelected, 
+    toggleSelection, 
+    isSelectionMode, 
+    lastSelectedIndex, 
+    setLastSelectedIndex 
+  } = useSelectionStore();
+  const isProjectSelected = isSelected(result.project_id);
+  
+  const handleCheckboxClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Shift+click for range selection
+    if (e.shiftKey && lastSelectedIndex !== null && onShiftSelect) {
+      onShiftSelect(lastSelectedIndex, index);
+    } else {
+      toggleSelection(result);
+      setLastSelectedIndex(index);
+    }
+  }, [result, index, lastSelectedIndex, toggleSelection, setLastSelectedIndex, onShiftSelect]);
 
   // Build images array - use provided images or fallback to single image
   const images: ProjectImage[] = result.images && result.images.length > 0
@@ -76,15 +105,20 @@ export function SearchResultCard({
   return (
     <div
       style={{
+        position: 'relative',
         backgroundColor: 'rgba(255,255,255,0.9)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         borderRadius: '12px',
-        border: '1px solid rgba(0,0,0,0.1)',
+        border: isProjectSelected 
+          ? '2px solid var(--accent)' 
+          : '1px solid rgba(0,0,0,0.1)',
         overflow: 'hidden',
         transition: 'all 200ms ease',
         transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
-        boxShadow: isHovered
+        boxShadow: isProjectSelected
+          ? '0 4px 16px rgba(182, 68, 36, 0.2)'
+          : isHovered
           ? '0 8px 24px rgba(0,0,0,0.12)'
           : '0 2px 8px rgba(0,0,0,0.06)',
         cursor: 'pointer',
@@ -228,6 +262,35 @@ export function SearchResultCard({
               />
             ))}
           </div>
+        )}
+
+        {/* Selection Checkbox - visible on hover or when in selection mode */}
+        {enableSelection && (isHovered || isSelectionMode || isProjectSelected) && (
+          <button
+            onClick={handleCheckboxClick}
+            title={isProjectSelected ? 'Deselect' : 'Select for export'}
+            style={{
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              width: '24px',
+              height: '24px',
+              borderRadius: '6px',
+              backgroundColor: isProjectSelected ? 'var(--accent)' : 'rgba(255,255,255,0.95)',
+              border: isProjectSelected ? 'none' : '2px solid rgba(0,0,0,0.2)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 150ms ease',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 10,
+            }}
+          >
+            {isProjectSelected && (
+              <Check size={14} style={{ color: 'white', strokeWidth: 3 }} />
+            )}
+          </button>
         )}
 
         {/* Hover Actions */}

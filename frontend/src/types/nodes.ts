@@ -13,7 +13,10 @@ export type NodeType =
   | 'operatorAND'
   | 'operatorOR'
   | 'operatorNOT'
-  | 'results';
+  | 'results'
+  | 'generate'
+  | 'validate'
+  | 'styleReference';
 
 export interface PrecedentProject {
   id: string;
@@ -176,6 +179,66 @@ export interface ResultsNodeData extends BaseNodeData {
   results?: any[];
 }
 
+// ============ Generation Node Types ============
+
+export interface GeneratedImageData {
+  id: string;
+  url: string | null;
+  prompt: string;
+  style: string;
+  variation: number;
+  description?: string;
+  embedding?: number[];
+}
+
+export interface GenerateNodeData extends BaseNodeData {
+  type: 'generate';
+  prompt: string;
+  style: 'photorealistic' | 'render' | 'sketch';
+  variationCount: 1 | 2 | 4;
+  styleReferenceUrl?: string;
+  styleReferenceDescription?: string;
+  generatedImages: GeneratedImageData[];
+  selectedImageIndex: number;
+  status?: 'idle' | 'generating' | 'complete' | 'error';
+  error?: string;
+}
+
+export interface ValidatedProjectData {
+  project_id: string;
+  title?: string;
+  similarity: number;
+  thumb_url?: string;
+  typology?: string;
+  country?: string;
+}
+
+export interface ValidateNodeData extends BaseNodeData {
+  type: 'validate';
+  inputImageUrl?: string;
+  inputEmbedding?: number[];
+  topK: number;
+  minSimilarity: number;
+  validatedProjects: ValidatedProjectData[];
+  validationScore: number;
+  status?: 'idle' | 'validating' | 'complete' | 'error';
+  error?: string;
+}
+
+export interface StyleReferenceNodeData extends BaseNodeData {
+  type: 'styleReference';
+  imageUrl?: string;
+  imageFile?: File;
+  extractMaterials: boolean;
+  extractPalette: boolean;
+  extractMassing: boolean;
+  styleDescription?: string;
+  extractedMaterials?: string[];
+  extractedPalette?: string[];
+  status?: 'idle' | 'extracting' | 'complete' | 'error';
+  error?: string;
+}
+
 export type NodeData = 
   | PrecedentNodeData 
   | StackedPrecedentNodeData
@@ -189,7 +252,10 @@ export type NodeData =
   | OperatorANDNodeData
   | OperatorORNodeData
   | OperatorNOTNodeData
-  | ResultsNodeData;
+  | ResultsNodeData
+  | GenerateNodeData
+  | ValidateNodeData
+  | StyleReferenceNodeData;
 
 export interface NodeGraph {
   nodes: Array<{

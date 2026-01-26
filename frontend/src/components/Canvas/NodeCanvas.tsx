@@ -22,6 +22,9 @@ import { OperatorANDNode } from '../Nodes/OperatorANDNode';
 import { OperatorORNode } from '../Nodes/OperatorORNode';
 import { OperatorNOTNode } from '../Nodes/OperatorNOTNode';
 import { ResultsNode } from '../Nodes/ResultsNode';
+import { GenerateNode } from '../Nodes/GenerateNode';
+import { ValidateNode } from '../Nodes/ValidateNode';
+import { StyleReferenceNode } from '../Nodes/StyleReferenceNode';
 import { ChildNodeGroup } from './ChildNodeGroup';
 import { NodeData, ParameterMatrix, PrecedentProject } from '../../types/nodes';
 import { MultiplyOutputsDialog } from '../Dialogs/MultiplyOutputsDialog';
@@ -37,6 +40,9 @@ import {
   createOperatorANDNode,
   createOperatorORNode,
   createOperatorNOTNode,
+  createGenerateNode,
+  createValidateNode,
+  createStyleReferenceNode,
 } from '../../lib/nodeFactory';
 import { SearchResult } from '../../stores/searchStore';
 import { SelectionContextMenu } from '../ContextMenu/SelectionContextMenu';
@@ -53,6 +59,9 @@ const nodeTypes: NodeTypes = {
   operatorOR: OperatorORNode,
   operatorNOT: OperatorNOTNode,
   results: ResultsNode,
+  generate: GenerateNode,
+  validate: ValidateNode,
+  styleReference: StyleReferenceNode,
   default: TextNode,
 };
 
@@ -401,7 +410,7 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [], 
           } catch (error) {
             console.error('Error parsing dropped data:', error);
           }
-        } else if (['text', 'image', 'attributeFilter', 'scalar', 'results', 'operatorAND', 'operatorOR', 'operatorNOT'].includes(nodeType)) {
+        } else if (['text', 'image', 'attributeFilter', 'scalar', 'results', 'operatorAND', 'operatorOR', 'operatorNOT', 'generate', 'validate', 'styleReference'].includes(nodeType)) {
           // Handle other node types
           let newNode: Node<NodeData> | null = null;
           
@@ -429,6 +438,15 @@ export const NodeCanvas: React.FC<NodeCanvasProps> = ({ initialPrecedents = [], 
               break;
             case 'operatorNOT':
               newNode = createOperatorNOTNode(position);
+              break;
+            case 'generate':
+              newNode = createGenerateNode(position);
+              break;
+            case 'validate':
+              newNode = createValidateNode(position);
+              break;
+            case 'styleReference':
+              newNode = createStyleReferenceNode(position);
               break;
           }
           
