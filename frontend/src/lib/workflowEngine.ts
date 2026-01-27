@@ -667,16 +667,20 @@ async function executeGenerateNode(
   }
 
   try {
+    console.log('[executeGenerateNode] Calling generateConcept API with prompt:', prompt);
     const response = await generateConcept({
       prompt,
       style,
       variations: variationCount,
       styleReferenceDescription,
     });
+    console.log('[executeGenerateNode] API response:', response);
 
     // Auto-spawn a blue ImageNode with the first generated image
     const firstImage = response.images[0];
+    console.log('[executeGenerateNode] First image:', firstImage);
     if (firstImage && firstImage.url) {
+      console.log('[executeGenerateNode] Spawning ImageNode with URL:', firstImage.url);
       // Position the ImageNode to the right of the GenerateNode
       const imageNodePosition = {
         x: node.position.x + 400,
@@ -688,6 +692,7 @@ async function executeGenerateNode(
       // Add the ImageNode to the canvas
       const { addNodes, addEdges } = useCanvasStore.getState();
       addNodes([imageNode]);
+      console.log('[executeGenerateNode] ImageNode added:', imageNode.id);
       
       // Create an edge connecting the GenerateNode output to the ImageNode input
       const edge = {
@@ -706,7 +711,7 @@ async function executeGenerateNode(
 
     return {
       outputs: {
-        output: response.images,
+        generatedImages: response.images,
         images: response.images,
         selectedImage: response.images[0],
         searchReady: response.search_ready,
@@ -714,6 +719,7 @@ async function executeGenerateNode(
       status: 'success',
     };
   } catch (error) {
+    console.error('[executeGenerateNode] Error:', error);
     return {
       outputs: {},
       status: 'error',

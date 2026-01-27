@@ -72,6 +72,11 @@ export function ResultsPage() {
     if (!selectedNode) return null;
     const data = selectedNode.data as any;
     
+    // Don't show results panel for generate/validate/styleReference nodes - they have their own output handling
+    if (data.type === 'generate' || data.type === 'validate' || data.type === 'styleReference') {
+      return null;
+    }
+    
     // Helper to transform project/result objects to SearchResult format
     const transformProject = (p: any): SearchResult => ({
       id: p.id || p.project_id || '',

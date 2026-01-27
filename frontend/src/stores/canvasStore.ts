@@ -542,6 +542,8 @@ export const useCanvasStore = create<CanvasState>()(
                     ...n, 
                     data: { 
                       ...n.data, 
+                      // Clear the 'generating' status and set the final status
+                      status: result.status === 'error' ? 'error' : 'complete',
                       executionStatus: result.status === 'error' ? 'error' : 'success',
                       executionError: result.error,
                       executionResult: result.outputs,
@@ -564,6 +566,7 @@ export const useCanvasStore = create<CanvasState>()(
                 ...n, 
                 data: { 
                   ...n.data, 
+                  status: 'error',
                   executionStatus: 'error',
                   executionError: error instanceof Error ? error.message : 'Unknown error',
                 } 
