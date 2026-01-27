@@ -676,18 +676,20 @@ async function executeGenerateNode(
     });
     console.log('[executeGenerateNode] API response:', response);
 
-    // Auto-spawn a blue ImageNode with the first generated image
-    const firstImage = response.images[0];
-    console.log('[executeGenerateNode] First image:', firstImage);
-    if (firstImage && firstImage.url) {
-      console.log('[executeGenerateNode] Spawning ImageNode with URL:', firstImage.url);
+    // Auto-spawn a blue ImageNode with the first generated image that has a URL
+    const firstImageWithUrl = response.images.find(img => img.url);
+    console.log('[executeGenerateNode] First image with URL:', firstImageWithUrl);
+    console.log('[executeGenerateNode] All images:', response.images);
+    
+    if (firstImageWithUrl && firstImageWithUrl.url) {
+      console.log('[executeGenerateNode] Spawning ImageNode with URL:', firstImageWithUrl.url);
       // Position the ImageNode to the right of the GenerateNode
       const imageNodePosition = {
         x: node.position.x + 400,
         y: node.position.y,
       };
       
-      const imageNode = createImageNode(imageNodePosition, firstImage.url);
+      const imageNode = createImageNode(imageNodePosition, firstImageWithUrl.url);
       
       // Add the ImageNode to the canvas
       const { addNodes, addEdges } = useCanvasStore.getState();
@@ -707,6 +709,10 @@ async function executeGenerateNode(
       setTimeout(() => {
         addEdges([edge]);
       }, 50);
+    } else {
+      // No image URL available - Gemini returned descriptions only (fallback mode)
+      console.warn('[executeGenerateNode] No image URLs returned - Gemini image generation may not be available. Descriptions only:', 
+        response.images.map(img => img.description));
     }
 
     return {

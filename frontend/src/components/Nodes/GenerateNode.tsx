@@ -48,10 +48,13 @@ export const GenerateNode: React.FC<GenerateNodeProps> = ({
     }
   }, [id, updateNode]);
 
-  // Execution status - check all possible status fields
-  const status = data.status || (data as any).executionStatus;
-  const isGenerating = status === 'generating' || status === 'running';
-  const isComplete = status === 'complete' || status === 'success';
+  // Execution status - prioritize executionStatus (set after execution) over status (set before)
+  const executionStatus = (data as any).executionStatus;
+  const nodeStatus = data.status;
+  // If executionStatus exists, use it (execution completed); otherwise fall back to nodeStatus
+  const status = executionStatus || nodeStatus;
+  const isGenerating = (nodeStatus === 'generating' || nodeStatus === 'running') && !executionStatus;
+  const isComplete = executionStatus === 'success' || status === 'complete';
   const error = data.error || (data as any).executionError;
   
   // Get generated images from executionResult or direct data
