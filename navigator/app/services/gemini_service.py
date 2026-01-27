@@ -142,20 +142,37 @@ class GeminiService:
                 logger.info(f"Successfully generated {len(generated_images)} images with Imagen 3")
                 return generated_images
             
-            # Fallback: Use Gemini Flash with image generation capabilities
+            # Fallback: Use Gemini 2.0 Flash with image generation capabilities
             generated_images = []
             try:
-                # Try gemini-2.0-flash-exp which supports image generation
-                model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                # Gemini 2.0 Flash Experimental with image generation
+                # Must use specific generation config to enable image output
+                logger.info("Attempting Gemini 2.0 Flash image generation...")
+                
+                generation_config = {
+                    "temperature": 1,
+                    "top_p": 0.95,
+                    "top_k": 40,
+                    "max_output_tokens": 8192,
+                    "response_modalities": ["image", "text"],  # Enable image output
+                    "response_mime_type": "text/plain",
+                }
+                
+                model = genai.GenerativeModel(
+                    model_name='gemini-2.0-flash-exp',
+                    generation_config=generation_config,
+                )
                 
                 for i in range(variation_count):
                     try:
-                        variation_prompt = f"""Generate an architectural visualization image with these characteristics:
-- Style: {style_instruction}
-- Concept: {prompt}
-- This is variation {i+1} of {variation_count}, make it unique
+                        variation_prompt = f"""Generate an architectural visualization image.
 
-Create a high-quality architectural image based on this description."""
+REQUIREMENTS:
+- Style: {style_instruction}
+- Subject: {prompt}
+- Variation: {i+1} of {variation_count} (make each unique)
+
+You MUST generate an actual image, not just describe one. Create a high-quality architectural rendering."""
                         
                         # Request image generation
                         response = await asyncio.to_thread(
@@ -168,21 +185,37 @@ Create a high-quality architectural image based on this description."""
                         description = f"Generated concept: {prompt}"
                         
                         # Check response for image data
+                        logger.debug(f"Response type: {type(response)}")
+                        logger.debug(f"Response has candidates: {hasattr(response, 'candidates')}")
+                        
                         if response and hasattr(response, 'candidates') and response.candidates:
                             candidate = response.candidates[0]
+                            logger.debug(f"Candidate has content: {hasattr(candidate, 'content')}")
                             if hasattr(candidate, 'content') and candidate.content:
+                                logger.debug(f"Number of parts: {len(candidate.content.parts)}")
                                 for part in candidate.content.parts:
-                                    # Check for inline image data
+                                    part_type = "unknown"
+                                    if hasattr(part, 'inline_data') and part.inline_data:
+                                        part_type = "image"
+                                    elif hasattr(part, 'text') and part.text:
+                                        part_type = "text"
+                                    logger.debug(f"Part type: {part_type}")
+                                    
+                                    # Check for inline image data (Gemini 2.0 image output)
                                     if hasattr(part, 'inline_data') and part.inline_data:
                                         data = part.inline_data
                                         if hasattr(data, 'data') and data.data:
                                             mime = getattr(data, 'mime_type', 'image/png')
                                             img_base64 = base64.b64encode(data.data).decode()
                                             img_url = f"data:{mime};base64,{img_base64}"
+                                            logger.info(f"Generated image for variation {i+1}")
                                             break
-                                    # Also capture text description
+                                    # Also capture text description as fallback
                                     elif hasattr(part, 'text') and part.text:
                                         description = part.text[:300]
+                        
+                        if not img_url:
+                            logger.warning(f"Variation {i+1}: No image in response, got text: {description[:100]}")
                         
                         generated_images.append({
                             "id": image_id,
@@ -205,7 +238,14 @@ Create a high-quality architectural image based on this description."""
                         })
                 
             except Exception as e:
-                logger.warning(f"Gemini 2.0 Flash failed, trying 1.5: {e}")
+                logger.warning(f"Gemini 2.0 Flash failed: {e}")
+                logger.warning(f"Exception type: {type(e).__name__}")
+                
+                # Check if any images were generated before the error
+                images_with_urls = [img for img in generated_images if img.get("url")]
+                if images_with_urls:
+                    logger.info(f"Returning {len(images_with_urls)} images generated before error")
+                    return generated_images
                 
                 # Final fallback: Gemini 1.5 Flash (text only, for descriptions)
                 try:
