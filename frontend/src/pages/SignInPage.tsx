@@ -1,11 +1,17 @@
 import React from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { SignIn } from '@clerk/clerk-react';
 import { ArrowLeft } from 'lucide-react';
 import { isAuthEnabled } from '../lib/auth';
 
 export function SignInPage() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  
+  // Parse redirect_url from query params
+  const params = new URLSearchParams(searchString);
+  const redirectUrl = params.get('redirect_url');
+  const afterSignInUrl = redirectUrl ? decodeURIComponent(redirectUrl) : '/';
 
   // If Clerk is not configured, show a placeholder
   if (!isAuthEnabled()) {
@@ -216,8 +222,8 @@ export function SignInPage() {
         <SignIn 
           routing="path" 
           path="/signin"
-          signUpUrl="/signup"
-          afterSignInUrl="/"
+          signUpUrl={redirectUrl ? `/signup?redirect_url=${encodeURIComponent(redirectUrl)}` : '/signup'}
+          afterSignInUrl={afterSignInUrl}
           appearance={{
             elements: {
               rootBox: {
