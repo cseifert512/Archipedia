@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { Menu, X, Building2, Mail, LogIn } from 'lucide-react';
+import { Menu, X, Building2, Mail } from 'lucide-react';
 
 interface HamburgerMenuProps {
   className?: string;
@@ -55,11 +55,6 @@ export function HamburgerMenu({ className }: HamburgerMenuProps) {
       label: 'Contact',
       icon: Mail,
       href: '/contact',
-    },
-    {
-      label: 'Sign In',
-      icon: LogIn,
-      href: '/signin',
     },
   ];
 
