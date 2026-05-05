@@ -2,7 +2,6 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Search, Sparkles } from "lucide-react";
 import { HamburgerMenu } from "../components/HamburgerMenu";
-import { useAuth } from "../lib/auth";
 
 export function SearchLandingPage() {
   const [query, setQuery] = useState("");
@@ -10,7 +9,6 @@ export function SearchLandingPage() {
   const [isFocused, setIsFocused] = useState(false);
   const [, setLocation] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
-  const { isAuthenticated, isLoading } = useAuth();
 
   // Focus input on mount
   useEffect(() => {
@@ -25,26 +23,13 @@ export function SearchLandingPage() {
 
       const encodedQuery = encodeURIComponent(trimmed);
 
-      // Check if user is authenticated - if not, redirect to sign in
-      if (!isAuthenticated && !isLoading) {
-        // Build the intended destination URL
-        const destinationPath = advancedMode
-          ? `/canvas?q=${encodedQuery}`
-          : `/search/classic?q=${encodedQuery}`;
-        const redirectUrl = encodeURIComponent(destinationPath);
-        setLocation(`/signin?redirect_url=${redirectUrl}`);
-        return;
-      }
-
       if (advancedMode) {
-        // Go to canvas with query as a parameter
         setLocation(`/canvas?q=${encodedQuery}`);
       } else {
-        // Go to classic search with query
         setLocation(`/search/classic?q=${encodedQuery}`);
       }
     },
-    [query, advancedMode, setLocation, isAuthenticated, isLoading]
+    [query, advancedMode, setLocation]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
