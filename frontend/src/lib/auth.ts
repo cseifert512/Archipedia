@@ -9,7 +9,7 @@ import { useUser, useAuth as useClerkAuth } from "@clerk/clerk-react";
  * Check if Clerk is configured and available
  */
 export const isAuthEnabled = (): boolean => {
-  return !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+  return false;
 };
 
 /**

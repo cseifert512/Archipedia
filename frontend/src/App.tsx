@@ -18,7 +18,6 @@ import { StudySearchPage } from "./pages/StudySearchPage";
 import { StudyResultsPage } from "./pages/StudyResultsPage";
 import { ContactPage } from "./pages/ContactPage";
 import { SignInPage } from "./pages/SignInPage";
-import { SignUpPage } from "./pages/SignUpPage";
 import { Toaster } from "./components/ui/sonner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -36,7 +35,7 @@ export default function App() {
         <Route path="/enterprise-details" component={EnterprisePage} />
         <Route path="/contact" component={ContactPage} />
         <Route path="/signin" component={SignInPage} />
-        <Route path="/signup" component={SignUpPage} />
+        <Route path="/signup" component={SearchLandingPage} />
         <Route path="/search" component={SearchLandingPage} />
         <Route path="/search/classic" component={ClassicSearchPage} />
         <Route path="/canvas" component={ResultsPage} />

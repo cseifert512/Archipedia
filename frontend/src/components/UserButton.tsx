@@ -1,7 +1,5 @@
 import React from 'react';
-import { useLocation } from 'wouter';
 import { UserButton as ClerkUserButton } from '@clerk/clerk-react';
-import { User, LogIn } from 'lucide-react';
 import { useAuth, isAuthEnabled } from '../lib/auth';
 
 interface UserButtonProps {
@@ -17,29 +15,12 @@ interface UserButtonProps {
  * - User avatar/dropdown if authenticated
  * - Nothing if auth is not configured
  */
-export function UserButton({ showLabel = false, className = '' }: UserButtonProps) {
-  const [, setLocation] = useLocation();
+export function UserButton({ className = '' }: UserButtonProps) {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // If auth is not enabled, show a simple sign-in link
+  // Anonymous users shouldn't be blocked or prompted on first use.
   if (!isAuthEnabled()) {
-    return (
-      <button
-        onClick={() => setLocation('/signin')}
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors hover:bg-black/5 ${className}`}
-        style={{
-          fontFamily: 'var(--font-secondary)',
-          fontSize: '13px',
-          color: 'rgba(0,0,0,0.7)',
-          border: 'none',
-          background: 'none',
-          cursor: 'pointer',
-        }}
-      >
-        <User size={16} />
-        {showLabel && <span>Sign in</span>}
-      </button>
-    );
+    return null;
   }
 
   // Loading state
@@ -81,31 +62,13 @@ export function UserButton({ showLabel = false, className = '' }: UserButtonProp
     );
   }
 
-  // Not authenticated: show sign in button
-  return (
-    <button
-      onClick={() => setLocation('/signin')}
-      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:bg-black/5 ${className}`}
-      style={{
-        fontFamily: 'var(--font-secondary)',
-        fontSize: '13px',
-        color: 'rgba(0,0,0,0.7)',
-        border: '1px solid rgba(0,0,0,0.1)',
-        background: 'white',
-        cursor: 'pointer',
-      }}
-    >
-      <LogIn size={16} />
-      {showLabel && <span>Sign in</span>}
-    </button>
-  );
+  return null;
 }
 
 /**
  * Compact user indicator for headers
  */
 export function UserIndicator() {
-  const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
 
   if (!isAuthEnabled()) {
@@ -132,14 +95,6 @@ export function UserIndicator() {
     );
   }
 
-  return (
-    <button
-      onClick={() => setLocation('/signin')}
-      className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-      title="Sign in"
-    >
-      <User size={14} className="text-gray-600" />
-    </button>
-  );
+  return null;
 }
 
